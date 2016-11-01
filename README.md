@@ -1,2 +1,2 @@
 # PCANet
-https://arxiv.org/pdf/1404.3606.pdf
+[The original paper](https://arxiv.org/pdf/1404.3606.pdf)
