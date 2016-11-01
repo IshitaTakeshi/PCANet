@@ -99,7 +99,7 @@ def convolutions(images, filters, filter_shape, step_shape):
 
 def binarize(images):
     output = np.zeros(images.shape[1:3])
-    for i, image in enumerate(reversed(images)):  # TODO check the order
+    for i, image in enumerate(reversed(images)):
         output += np.power(2, i) * heaviside_step(image)
     return output
 
@@ -110,10 +110,22 @@ class PCANet(object):
                  filter_shape_l2, step_shape_l2, n_l2_output,
                  block_shape):
         """
-        :n_l1_output: L1 in the original paper. The number of outputs
-        obtained from a set of input images.
-        :n_l2_output: L2 in the original paper. The number of outputs
-        obtained from each L1 output.
+        :filter_shape_l1: int or sequence of ints
+            The shape of the kernel in the first convolution layer.
+        :step_shape_l1: int or sequence of ints
+            The shape of kernel step in the first convolution layer.
+        :n_l1_output:
+            L1 in the original paper. The number of outputs obtained
+            from a set of input images.
+        :filter_shape_l2: int or sequence of ints
+            The shape of the kernel in the second convolution layer.
+        :step_shape_l2: int or sequence of ints
+            The shape of kernel step in the second convolution layer.
+        :n_l2_output:
+            L2 in the original paper. The number of outputs obtained
+            from each L1 output.
+        :block_shape: int or sequence of ints
+            The shape of each block in the pooling layer.
         """
         self.filter_shape_l1 = filter_shape_l1
         self.step_shape_l1 = step_shape_l1
@@ -150,15 +162,15 @@ class PCANet(object):
         #                      [    ]|[    ]
         #
         # Supporse data in a block is in range [0, 3] and the acutual
-        # values is
+        # values are
         # [0 0 1]
         # [2 2 2]
-        # [2 3 3],
-        # then the default bins will be [-0.5 0.5 1.5 2.5 3.5]
-        # and the histogram will be [2 1 4 2].
-        # The range of data divided equally if n_bins is specified.
+        # [2 3 3]
+        # If default bins [-0.5 0.5 1.5 2.5 3.5] applied,
+        # then the histogram will be [2 1 4 2].
+        # If n_bins is specified, the range of data divided equally.
         # For example, if the data is in range [0, 3] and n_bins = 2,
-        # bins will be [-0.5 1.5 3.5] and then the histogram will be [3 6].
+        # bins will be [-0.5 1.5 3.5] and the histogram will be [3 6].
 
         k = pow(2, self.n_l2_output)
         if self.n_bins is None:
@@ -194,20 +206,23 @@ class PCANet(object):
         assert(np.ndim(images) == 3)  # input image must be grayscale
 
         n_images = images.shape[0]
-        print("n_images: " + str(n_images))
 
         # images.shape == (n_images, y, x)
         L1 = self.convolution_l1(images)
-        # now images.shape == (L1, n_images, y, x)
 
+        # L1.shape == (L1, n_images, y, x)
+        # iterate over each L1 output
         X = []
-        for T in L1:
-            # input T of shape (n_images, y, x)
-            T = self.convolution_l2(T)  # T.shape == (L2, n_images, y, x)
-            T = np.swapaxes(T, 0, 1)  # T.shape == (n_images, L2, y, x)
-            x = [self.histogram(binarize(t)) for t in T]
+        for maps in L1:
+            # maps.shape == (n_images, y, x)
+            maps = self.convolution_l2(maps)  # maps.shape == (L2, n_images, y, x)
+            maps = np.swapaxes(maps, 0, 1)  # maps.shape == (n_images, L2, y, x)
+            x = [self.histogram(binarize(m)) for m in maps]
             X.append(x)
         X = np.array(X)
-        # TODO explain
-        X = np.swapaxes(X, 0, 1)
-        return X.reshape(n_images, -1)
+        # transform X into the form (n_images, n_features).
+        # now X.shape == (L1, n_images, n) where n is a value derived
+        # from block_shape and the dimensions of each histogram.
+        X = np.swapaxes(X, 0, 1)  # X.shape == (n_images, L1, n)
+        X = X.reshape(n_images, -1)  # flatten each subarray
+        return X  # now X.shape == (n_images, L1*n)
