@@ -23,6 +23,7 @@ class Patches(object):
         self.ys = range(0, h-fh+1, sh)
         self.xs = range(0, w-fw+1, sw)
 
+    @property
     def patches_with_indices(self):
         """
         Yields patches with its location indices.
@@ -32,23 +33,24 @@ class Patches(object):
         :patch: (j, i)th patch
         """
 
-        # The behaviour is as same as below:
+        # The behaviour is same as below:
         # ```
         # for j, y in enumerate(self.ys):
         #     for i, x in enumerate(self.xs):
         #         yield j, i, self.image[y:y+sh, x:x+sw]
         # ```
-        # But the code above does not work if called multiple times,
+        # But the code above does not work when the second time calling,
         # so we create a generator object every time of function call.
         fh, fw = self.filter_shape
         it = itertools.product(enumerate(self.ys), enumerate(self.xs))
         return ((j, i, self.image[y:y+fh, x:x+fw]) for (j, y), (i, x) in it)
 
+    @property
     def patches(self):
         """
         Return patches
         """
-        return np.array([p for j, i, p in self.patches_with_indices()])
+        return np.array([p for j, i, p in self.patches_with_indices])
 
     @property
     def output_shape(self):
@@ -73,7 +75,7 @@ def images_to_patches(images, filter_shape, step_shape):
     patches that can be obtained from one image).
     """
     def f(image):
-        X = Patches(image, filter_shape, step_shape).patches()
+        X = Patches(image, filter_shape, step_shape).patches
         X = X.reshape(X.shape[0], -1)  # reshape each patch into a vector
         return normalize(X)
 
@@ -83,7 +85,7 @@ def images_to_patches(images, filter_shape, step_shape):
 def convolution(images, filter_, filter_shape, step_shape):
     def convolution_(patches):
         L = np.empty(patches.output_shape)
-        for j, i, patch in patches.patches_with_indices():
+        for j, i, patch in patches.patches_with_indices:
             L[j, i] = np.dot(filter_.flatten(), patch.flatten())
         return L
 
@@ -180,7 +182,7 @@ class PCANet(object):
         patches = Patches(binary_image, self.block_shape, self.block_shape)
 
         hist = []
-        for patch in patches.patches():
+        for patch in patches.patches:
             h, _ = np.histogram(patch, bins)
             hist.append(h)
         return np.concatenate(hist)
