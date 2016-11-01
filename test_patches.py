@@ -55,7 +55,7 @@ class TestPatches(unittest.TestCase):
             [[4, 5],
              [7, 8]]
         ])
-        for index, (j, i, patch) in enumerate(patches.patches_with_indices()):
+        for index, (j, i, patch) in enumerate(patches.patches_with_indices):
             self.assertEqual([j, i], expected_coordinates[index])
             assert_array_equal(patch, expected_patches[index])
 
@@ -69,7 +69,7 @@ class TestPatches(unittest.TestCase):
         # [0 1]  [1 2]  [3 4]  [4 5]
         # [3 4]  [4 5]  [6 7]  [7 8]
         image = np.arange(9).reshape(3, 3)
-        patches = Patches(image, (2, 2), (1, 1)).patches()
+        patches = Patches(image, (2, 2), (1, 1)).patches
         expected = np.array([
             [[0, 1],
              [3, 4]],
