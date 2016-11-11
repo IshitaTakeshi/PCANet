@@ -9,28 +9,41 @@ import numpy as np
 from sklearn.decomposition import PCA
 
 
+def steps(image_shape, filter_shape, step_shape):
+    h, w = image_shape
+    fh, fw = filter_shape
+    sh, sw = step_shape
+
+    ys = range(0, h-fh+1, sh)
+    xs = range(0, w-fw+1, sw)
+    return ys, xs
+
+
+def output_shape(ys, xs):
+    return len(ys), len(xs)
+
+
 class Patches(object):
     def __init__(self, image, filter_shape, step_shape):
         self.image = image
-
         self.filter_shape = filter_shape
-        self.step_shape = step_shape
 
-        h, w = image.shape
-        fh, fw = filter_shape
-        sh, sw = step_shape
-
-        self.ys = range(0, h-fh+1, sh)
-        self.xs = range(0, w-fw+1, sw)
+        self.ys, self.xs = steps(image.shape, filter_shape, step_shape)
 
     @property
     def patches_with_indices(self):
         """
         Yields patches with its location indices.
         Kernel visits the image from the left top into right bottom.
-        :j:
-        :i:
-        :patch: (j, i)th patch
+
+        Yields
+        ------
+        j : int
+            Index of the patch along y axis
+        i : int
+            Index of the patch along x axis
+        patch : np.ndarray
+            (j, i)th patch
         """
 
         # The behaviour is same as below:
@@ -54,12 +67,12 @@ class Patches(object):
 
     @property
     def output_shape(self):
-        return len(self.ys), len(self.xs)
+        return output_shape(self.ys, self.xs)
 
 
 def heaviside_step(X):
-    X[X>0] = 1
-    X[X<=0] = 0
+    X[X > 0] = 1
+    X[X <= 0] = 0
     return X
 
 
@@ -71,8 +84,9 @@ def normalize(X):
 def images_to_patches(images, filter_shape, step_shape):
     """
     Each row of X represents a flattened patch
-    The number of columns is (number of images) x (number of
-    patches that can be obtained from one image).
+    The number of columns is N x M where
+    N is the number of images and
+    M is the number of patches that can be obtained from one image.
     """
     def f(image):
         X = Patches(image, filter_shape, step_shape).patches
@@ -106,38 +120,50 @@ def binarize(images):
     return output
 
 
+def to_tuple_if_int(value):
+    """
+    If int is given, duplicate it and return as a 2 element tuple.
+    """
+    if isinstance(value, int):
+        return (value, value)
+    return value
+
+
 class PCANet(object):
     def __init__(self,
                  filter_shape_l1, step_shape_l1, n_l1_output,
                  filter_shape_l2, step_shape_l2, n_l2_output,
                  block_shape):
         """
-        :filter_shape_l1: int or sequence of ints
+        Parameters
+        ----------
+        filter_shape_l1: int or sequence of ints
             The shape of the kernel in the first convolution layer.
-        :step_shape_l1: int or sequence of ints
+        step_shape_l1: int or sequence of ints
             The shape of kernel step in the first convolution layer.
-        :n_l1_output:
+        n_l1_output:
             L1 in the original paper. The number of outputs obtained
             from a set of input images.
-        :filter_shape_l2: int or sequence of ints
+        filter_shape_l2: int or sequence of ints
             The shape of the kernel in the second convolution layer.
-        :step_shape_l2: int or sequence of ints
+        step_shape_l2: int or sequence of ints
             The shape of kernel step in the second convolution layer.
-        :n_l2_output:
+        n_l2_output:
             L2 in the original paper. The number of outputs obtained
             from each L1 output.
-        :block_shape: int or sequence of ints
+        block_shape: int or sequence of ints
             The shape of each block in the pooling layer.
         """
-        self.filter_shape_l1 = filter_shape_l1
-        self.step_shape_l1 = step_shape_l1
+
+        self.filter_shape_l1 = to_tuple_if_int(filter_shape_l1)
+        self.step_shape_l1 = to_tuple_if_int(step_shape_l1)
         self.n_l1_output = n_l1_output
 
-        self.filter_shape_l2 = filter_shape_l2
-        self.step_shape_l2 = step_shape_l2
+        self.filter_shape_l2 = to_tuple_if_int(filter_shape_l2)
+        self.step_shape_l2 = to_tuple_if_int(step_shape_l2)
         self.n_l2_output = n_l2_output
 
-        self.block_shape = block_shape
+        self.block_shape = to_tuple_if_int(block_shape)
         self.n_bins = None  # TODO make n_bins specifiable
 
         self.pca_l1 = PCA(n_l1_output)
@@ -154,25 +180,25 @@ class PCANet(object):
                             self.step_shape_l2)
 
     def histogram(self, binary_image):
-        # Separate a given image into blocks and calculate a histogram
-        # in each block
-        #
-        # [       ]            [    ]|[    ]
-        # [       ]            [    ]|[    ]
-        # [       ]  ------>   ------+------
-        # [       ]            [    ]|[    ]
-        #                      [    ]|[    ]
-        #
-        # Supporse data in a block is in range [0, 3] and the acutual
-        # values are
-        # [0 0 1]
-        # [2 2 2]
-        # [2 3 3]
-        # If default bins [-0.5 0.5 1.5 2.5 3.5] applied,
-        # then the histogram will be [2 1 4 2].
-        # If n_bins is specified, the range of data divided equally.
-        # For example, if the data is in range [0, 3] and n_bins = 2,
-        # bins will be [-0.5 1.5 3.5] and the histogram will be [3 6].
+        """
+        Separate a given image into blocks and calculate a histogram
+        in each block.
+
+        Supporse data in a block is in range [0, 3] and the acutual
+        values are
+
+        ::
+
+            [0 0 1]
+            [2 2 2]
+            [2 3 3]
+
+        If default bins ``[-0.5 0.5 1.5 2.5 3.5]`` applied,
+        then the histogram will be ``[2 1 4 2]``.
+        If ``n_bins`` is specified, the range of data divided equally.
+        For example, if the data is in range ``[0, 3]`` and ``n_bins = 2``,
+        bins will be ``[-0.5 1.5 3.5]`` and the histogram will be ``[3 6]``.
+        """
 
         k = pow(2, self.n_l2_output)
         if self.n_bins is None:
@@ -217,8 +243,11 @@ class PCANet(object):
         X = []
         for maps in L1:
             # maps.shape == (n_images, y, x)
-            maps = self.convolution_l2(maps)  # maps.shape == (L2, n_images, y, x)
-            maps = np.swapaxes(maps, 0, 1)  # maps.shape == (n_images, L2, y, x)
+            maps = self.convolution_l2(maps)
+            # feature maps are generated.
+            # maps.shape == (L2, n_images, y, x) right here
+            maps = np.swapaxes(maps, 0, 1)
+            # maps.shape == (n_images, L2, y, x)
             x = [self.histogram(binarize(m)) for m in maps]
             X.append(x)
         X = np.array(X)
@@ -228,3 +257,30 @@ class PCANet(object):
         X = np.swapaxes(X, 0, 1)  # X.shape == (n_images, L1, n)
         X = X.reshape(n_images, -1)  # flatten each subarray
         return X  # now X.shape == (n_images, L1*n)
+
+    def structure_is_valid(self, image_shape):
+        """
+        Check that the filter visits all pixels of input images without
+        dropping any information.
+        """
+        def is_valid_(image_shape, filter_shape, step_shape):
+            ys, xs = steps(image_shape, filter_shape, step_shape)
+            fh, fw = filter_shape
+            h, w = image_shape
+            assert(ys[-1]+fh == h)
+            assert(xs[-1]+fw == w)
+            return output_shape(ys, xs)
+
+        image_shape = to_tuple_if_int(image_shape)
+
+        try:
+            output_shape_l1 = is_valid_(image_shape,
+                                        self.filter_shape_l1,
+                                        self.step_shape_l1)
+            output_shape_l2 = is_valid_(output_shape_l1,
+                                        self.filter_shape_l2,
+                                        self.step_shape_l2)
+            is_valid_(output_shape_l2, self.block_shape, self.block_shape)
+        except AssertionError:
+            return False
+        return True
