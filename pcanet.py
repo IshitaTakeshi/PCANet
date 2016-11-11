@@ -4,7 +4,6 @@
 # TODO use sphinx
 import itertools
 
-from scipy import linalg
 import numpy as np
 from sklearn.decomposition import PCA
 
