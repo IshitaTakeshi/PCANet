@@ -213,6 +213,7 @@ class PCANet(object):
         return np.concatenate(hist)
 
     def fit(self, images):
+        assert(np.ndim(images) == 3)  # input image must be grayscale
         n_images = images.shape[0]
         patches = images_to_patches(images,
                                     self.filter_shape_l1,
@@ -255,7 +256,7 @@ class PCANet(object):
         # from block_shape and the dimensions of each histogram.
         X = np.swapaxes(X, 0, 1)  # X.shape == (n_images, L1, n)
         X = X.reshape(n_images, -1)  # flatten each subarray
-        return X  # now X.shape == (n_images, L1*n)
+        return X.astype(np.float64)  # now X.shape == (n_images, L1*n)
 
     def structure_is_valid(self, image_shape):
         """
