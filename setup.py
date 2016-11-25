@@ -6,5 +6,9 @@ setup(
     name="pcanet",
     version="0.0.1",
     author="Takeshi Ishita",
-    py_modules=["pcanet"]
+    py_modules=["pcanet"],
+    install_requires=[
+        'numpy',
+        'scikit-learn'
+    ],
 )

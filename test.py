@@ -3,6 +3,7 @@ import numpy as np
 from numpy.testing import assert_array_equal
 
 from pcanet import Patches, PCANet, convolution, normalize, binarize
+from pcanet import to_tuple_if_int
 
 
 class TestPatches(unittest.TestCase):
@@ -140,8 +141,56 @@ class TestPCANet(unittest.TestCase):
         # assume that n_l1_output = 2
         assert_array_equal(pcanet.histogram(image), expected)
 
+    def test_to_tuple_if_int(self):
+        # duplicate if int is given
+        self.assertEqual(to_tuple_if_int(10), (10, 10))
+        # do nothing if non-integer is given
+        self.assertEqual(to_tuple_if_int((10, 10)), (10, 10))
+
     def test_pca(self):
         pass
 
+    def test_structure_is_valid(self):
+        # Check whether filters visit all pixels of input images
+        pcanet = PCANet(
+            filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
+            filter_shape_l2=3, step_shape_l2=1, n_l2_output=1,
+            block_shape=1
+        )
+        self.assertTrue(pcanet.structure_is_valid(image_shape=9))
+        self.assertFalse(pcanet.structure_is_valid(image_shape=10))
+
+        # Check whether filters visit all pixels of L1 output
+        # the shape of L1 output is (6, 6)
+        pcanet = PCANet(
+            filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
+            filter_shape_l2=3, step_shape_l2=1, n_l2_output=1,
+            block_shape=1
+        )
+        self.assertTrue(pcanet.structure_is_valid(image_shape=13))
+
+        pcanet = PCANet(
+            filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
+            filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
+            block_shape=1
+        )
+        self.assertFalse(pcanet.structure_is_valid(image_shape=13))
+
+        # Check whether blocks cover all pixels of L2 output
+        # the shape of L1 output is (9, 9)
+        # the shape of L2 output is (4, 4)
+        pcanet = PCANet(
+            filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
+            filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
+            block_shape=2
+        )
+        self.assertTrue(pcanet.structure_is_valid(image_shape=19))
+
+        pcanet = PCANet(
+            filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
+            filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
+            block_shape=3
+        )
+        self.assertFalse(pcanet.structure_is_valid(image_shape=19))
 
 unittest.main()
