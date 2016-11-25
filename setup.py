@@ -9,6 +9,7 @@ setup(
     py_modules=["pcanet"],
     install_requires=[
         'numpy',
+        'scipy',
         'scikit-learn'
     ],
 )
