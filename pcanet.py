@@ -258,29 +258,26 @@ class PCANet(object):
         X = X.reshape(n_images, -1)  # flatten each subarray
         return X.astype(np.float64)  # now X.shape == (n_images, L1*n)
 
-    def structure_is_valid(self, image_shape):
+    def validate_structure(self, image_shape):
         """
         Check that the filter visits all pixels of input images without
         dropping any information.
+        Raise ValueError if the network structure does not satisfy the above constraint.
         """
         def is_valid_(image_shape, filter_shape, step_shape):
             ys, xs = steps(image_shape, filter_shape, step_shape)
             fh, fw = filter_shape
             h, w = image_shape
-            assert(ys[-1]+fh == h)
-            assert(xs[-1]+fw == w)
+            if ys[-1]+fh != h or xs[-1]+fw != w:
+                raise ValueError("Invalid network structure.")
             return output_shape(ys, xs)
 
         image_shape = to_tuple_if_int(image_shape)
 
-        try:
-            output_shape_l1 = is_valid_(image_shape,
-                                        self.filter_shape_l1,
-                                        self.step_shape_l1)
-            output_shape_l2 = is_valid_(output_shape_l1,
-                                        self.filter_shape_l2,
-                                        self.step_shape_l2)
-            is_valid_(output_shape_l2, self.block_shape, self.block_shape)
-        except AssertionError:
-            return False
-        return True
+        output_shape_l1 = is_valid_(image_shape,
+                                    self.filter_shape_l1,
+                                    self.step_shape_l1)
+        output_shape_l2 = is_valid_(output_shape_l1,
+                                    self.filter_shape_l2,
+                                    self.step_shape_l2)
+        is_valid_(output_shape_l2, self.block_shape, self.block_shape)

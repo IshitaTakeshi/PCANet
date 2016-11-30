@@ -150,15 +150,15 @@ class TestPCANet(unittest.TestCase):
     def test_pca(self):
         pass
 
-    def test_structure_is_valid(self):
+    def test_validate_structure(self):
         # Check whether filters visit all pixels of input images
         pcanet = PCANet(
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=1, n_l2_output=1,
             block_shape=1
         )
-        self.assertTrue(pcanet.structure_is_valid(image_shape=9))
-        self.assertFalse(pcanet.structure_is_valid(image_shape=10))
+        pcanet.validate_structure(image_shape=9)
+        self.assertRaises(ValueError, pcanet.validate_structure, image_shape=10)
 
         # Check whether filters visit all pixels of L1 output
         # the shape of L1 output is (6, 6)
@@ -167,14 +167,14 @@ class TestPCANet(unittest.TestCase):
             filter_shape_l2=3, step_shape_l2=1, n_l2_output=1,
             block_shape=1
         )
-        self.assertTrue(pcanet.structure_is_valid(image_shape=13))
+        pcanet.validate_structure(image_shape=13)
 
         pcanet = PCANet(
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
             block_shape=1
         )
-        self.assertFalse(pcanet.structure_is_valid(image_shape=13))
+        self.assertRaises(ValueError, pcanet.validate_structure, image_shape=13)
 
         # Check whether blocks cover all pixels of L2 output
         # the shape of L1 output is (9, 9)
@@ -184,13 +184,13 @@ class TestPCANet(unittest.TestCase):
             filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
             block_shape=2
         )
-        self.assertTrue(pcanet.structure_is_valid(image_shape=19))
+        pcanet.validate_structure(image_shape=19)
 
         pcanet = PCANet(
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
             block_shape=3
         )
-        self.assertFalse(pcanet.structure_is_valid(image_shape=19))
+        self.assertRaises(ValueError, pcanet.validate_structure, image_shape=19)
 
 unittest.main()
