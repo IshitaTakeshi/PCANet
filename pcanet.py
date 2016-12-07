@@ -129,13 +129,15 @@ def to_tuple_if_int(value):
 
 
 class PCANet(object):
-    def __init__(self,
+    def __init__(self, image_shape,
                  filter_shape_l1, step_shape_l1, n_l1_output,
                  filter_shape_l2, step_shape_l2, n_l2_output,
                  block_shape):
         """
         Parameters
         ----------
+        image_shape: int or sequence of ints
+            Input image shape.
         filter_shape_l1: int or sequence of ints
             The shape of the kernel in the first convolution layer.
         step_shape_l1: int or sequence of ints
@@ -153,6 +155,8 @@ class PCANet(object):
         block_shape: int or sequence of ints
             The shape of each block in the pooling layer.
         """
+
+        self.image_shape = to_tuple_if_int(image_shape)
 
         self.filter_shape_l1 = to_tuple_if_int(filter_shape_l1)
         self.step_shape_l1 = to_tuple_if_int(step_shape_l1)
@@ -214,6 +218,7 @@ class PCANet(object):
 
     def fit(self, images):
         assert(np.ndim(images) == 3)  # input image must be grayscale
+        assert(images.shape[1:3] == self.image_shape)
         n_images = images.shape[0]
         patches = images_to_patches(images,
                                     self.filter_shape_l1,
@@ -232,6 +237,7 @@ class PCANet(object):
 
     def transform(self, images):
         assert(np.ndim(images) == 3)  # input image must be grayscale
+        assert(images.shape[1:3] == self.image_shape)
 
         n_images = images.shape[0]
 
@@ -258,23 +264,21 @@ class PCANet(object):
         X = X.reshape(n_images, -1)  # flatten each subarray
         return X.astype(np.float64)  # now X.shape == (n_images, L1*n)
 
-    def validate_structure(self, image_shape):
+    def validate_structure(self):
         """
         Check that the filter visits all pixels of input images without
         dropping any information.
         Raise ValueError if the network structure does not satisfy the above constraint.
         """
-        def is_valid_(image_shape, filter_shape, step_shape):
-            ys, xs = steps(image_shape, filter_shape, step_shape)
+        def is_valid_(input_shape, filter_shape, step_shape):
+            ys, xs = steps(input_shape, filter_shape, step_shape)
             fh, fw = filter_shape
-            h, w = image_shape
+            h, w = input_shape
             if ys[-1]+fh != h or xs[-1]+fw != w:
                 raise ValueError("Invalid network structure.")
             return output_shape(ys, xs)
 
-        image_shape = to_tuple_if_int(image_shape)
-
-        output_shape_l1 = is_valid_(image_shape,
+        output_shape_l1 = is_valid_(self.image_shape,
                                     self.filter_shape_l1,
                                     self.step_shape_l1)
         output_shape_l2 = is_valid_(output_shape_l1,
