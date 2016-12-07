@@ -55,7 +55,7 @@ pcanet = PCANet(
     filter_shape_l2=2, step_shape_l2=1, n_l2_output=4,
     block_shape=2
 )
-pcanet.structure_is_valid(images_train.shape[1:3])
+pcanet.validate_structure(images_train.shape[1:3])
 
 pcanet.fit(images_train)
 X_train = pcanet.transform(images_train)
