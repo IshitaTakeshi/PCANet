@@ -136,7 +136,7 @@ class TestPCANet(unittest.TestCase):
             1, 2, 2, 1
         ])
 
-        pcanet = PCANet(None, None, None, None, None,
+        pcanet = PCANet(None, None, None, None, None, None,
                         n_l2_output=2, block_shape=(3, 2))
         # assume that n_l1_output = 2
         assert_array_equal(pcanet.histogram(image), expected)
@@ -153,44 +153,56 @@ class TestPCANet(unittest.TestCase):
     def test_validate_structure(self):
         # Check whether filters visit all pixels of input images
         pcanet = PCANet(
+            image_shape=9,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=1, n_l2_output=1,
             block_shape=1
         )
-        pcanet.validate_structure(image_shape=9)
-        self.assertRaises(ValueError, pcanet.validate_structure, image_shape=10)
+        pcanet.validate_structure()
+
+        pcanet = PCANet(
+            image_shape=10,
+            filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
+            filter_shape_l2=3, step_shape_l2=1, n_l2_output=1,
+            block_shape=1
+        )
+        self.assertRaises(ValueError, pcanet.validate_structure)
 
         # Check whether filters visit all pixels of L1 output
         # the shape of L1 output is (6, 6)
         pcanet = PCANet(
+            image_shape=13,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=1, n_l2_output=1,
             block_shape=1
         )
-        pcanet.validate_structure(image_shape=13)
+        pcanet.validate_structure()
 
         pcanet = PCANet(
+            image_shape=13,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
             block_shape=1
         )
-        self.assertRaises(ValueError, pcanet.validate_structure, image_shape=13)
+        self.assertRaises(ValueError, pcanet.validate_structure)
 
         # Check whether blocks cover all pixels of L2 output
         # the shape of L1 output is (9, 9)
         # the shape of L2 output is (4, 4)
         pcanet = PCANet(
+            image_shape=19,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
             block_shape=2
         )
-        pcanet.validate_structure(image_shape=19)
+        pcanet.validate_structure()
 
         pcanet = PCANet(
+            image_shape=19,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
             block_shape=3
         )
-        self.assertRaises(ValueError, pcanet.validate_structure, image_shape=19)
+        self.assertRaises(ValueError, pcanet.validate_structure)
 
 unittest.main()
