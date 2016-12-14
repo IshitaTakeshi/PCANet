@@ -6,6 +6,10 @@ PCANet is a deep learning network for image classification.
 As the name suggests, weights in the network are calculated by PCA. Because of this characteristics, training of PCANet is extremely fast. Furthermore, class labels are not required in training of PCANet itself.  
 Details are described in [the original paper](https://arxiv.org/abs/1404.3606).
 
+## Installation
+Just running `python3 setup.py install`.
+If you prefer pip, `pip3 install .` in the PCANet root directory.
+
 ## Usage
 
 ```python
