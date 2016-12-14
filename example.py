@@ -46,10 +46,6 @@ images_test, y_test = shuffle(images_test, y_test, random_state=0)
 images_test, y_test = images_test[:n_test], y_test[:n_test]
 
 
-# digits = load_digits()
-# images = digits.images
-# y = digits.target
-
 pcanet = PCANet(
     image_shape=28,
     filter_shape_l1=2, step_shape_l1=1, n_l1_output=4,
