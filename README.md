@@ -12,7 +12,7 @@ Details are described in [the original paper](https://arxiv.org/abs/1404.3606).
 from pcanet import PCANet
 
 # Arguments are basically passed as tuple in the form (height, width) but int is also allowed. 
-# If int is given, the parameter will be converted into (size, size).
+# If int is given, the parameter will be converted into (size, size) implicitly.
 pcanet = PCANet(
     image_shape=28,  # the size of an input image
     # kernel size, kernel step size, and the number of filters in the first layer, respectively
