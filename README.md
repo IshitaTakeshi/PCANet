@@ -27,6 +27,7 @@ pcanet = PCANet(
 )
 
 # Check whether all pixels can be considered. Raise ValueError if the structure is not valid.
+# Calling this function is optional. PCANet works without this line.
 pcanet.validate_structure()
 
 pcanet.fit(images_train)  # Train PCANet
