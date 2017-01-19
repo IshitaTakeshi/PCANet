@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_array_equal
 
-from pcanet import Patches, PCANet, convolution, normalize, binarize
+from pcanet import Patches, PCANet, PatchNormalizer, convolution, binarize
 from pcanet import to_tuple_if_int
 
 
@@ -85,13 +85,6 @@ class TestPatches(unittest.TestCase):
 
 
 class TestPCANet(unittest.TestCase):
-    def test_normalize(X):
-        X = np.array([
-            [0, 1, 3, -3, 4, 2],
-            [8, 2, 3, 1, -6, 5]
-        ])
-        assert_array_equal(np.mean(normalize(X), axis=0), np.zeros(6))
-
     def test_images_to_patches(self):
         # TODO
         pass
@@ -147,8 +140,47 @@ class TestPCANet(unittest.TestCase):
         # do nothing if non-integer is given
         self.assertEqual(to_tuple_if_int((10, 10)), (10, 10))
 
-    def test_pca(self):
-        pass
+    def test_patch_normalizer(self):
+        X = np.array([
+            [[0, 2],
+             [2, 1]],
+            [[1, 3],
+             [3, 0]],
+            [[2, 1],
+             [1, 2]]
+        ])
+
+        normalizer = PatchNormalizer(X)
+
+        expected = np.array([
+            [[1, 2],
+             [2, 1]]
+        ])
+        assert_array_equal(normalizer.mean, expected)
+
+        p = np.array([
+            [1, 3],
+            [2, 1]
+        ])
+        expected = np.array([
+            [0, 1],
+            [0, 0]
+        ])
+        assert_array_equal(normalizer.normalize_patch(p), expected)
+
+        P = np.array([
+            [[0, 3],
+             [1, 0]],
+            [[1, 1],
+             [2, 3]]
+        ])
+        expected = np.array([
+            [[-1, 1],
+             [-1, -1]],
+            [[0, -1],
+             [0, 2]]
+        ])
+        assert_array_equal(normalizer.normalize_patches(P), expected)
 
     def test_validate_structure(self):
         # Check whether filters visit all pixels of input images

@@ -69,29 +69,76 @@ class Patches(object):
         return output_shape(self.ys, self.xs)
 
 
+class PatchNormalizer(object):
+    """
+    Class for Patch-mean removal
+    """
+
+    def __init__(self, patches):
+        """
+        Parameters
+        ----------
+        patches: np.ndarray
+            Set of patches which represented as a 3D array.
+        """
+
+        # mean.shape == (1, height, width)
+        self.mean = patches.mean(axis=0, keepdims=True)
+
+    def normalize_patch(self, patch):
+        """
+        Normalize a patch.
+
+        Parameters
+        ----------
+        patch: np.ndarray
+            A patch represented as a 2D array
+        """
+        return patch - self.mean[0]
+
+    def normalize_patches(self, patches):
+        """
+        Normalize patches.
+
+        Parameters
+        ----------
+        patch: np.ndarray
+            Set of patches represented as a 3D array
+        """
+        return patches - self.mean
+
+
 def heaviside_step(X):
     X[X > 0] = 1
     X[X <= 0] = 0
     return X
 
 
-def normalize(X):
-    """Subtract mean so that the mean of X be a zero vector"""
-    return X - X.mean(axis=0, keepdims=True)
-
-
-def images_to_patches(images, filter_shape, step_shape):
+def images_to_patch_vectors(images, filter_shape, step_shape):
     """
-    Each row of X represents a flattened patch
+    Parameters
+    ----------
+    images: np.array
+        Images to extract patch vectors
+    filter_shape: tuple of ints
+        The shape of a filter
+    step_shape: tuple of ints
+        Step height/width of a filter
+
+    Returns
+    -------
+    X: np.array
+        A set of normalized and flattened patches
+
+    Each row of X represents a flattened patch.
     The number of columns is N x M where
     N is the number of images and
     M is the number of patches that can be obtained from one image.
     """
     def f(image):
         X = Patches(image, filter_shape, step_shape).patches
-        X = X.reshape(X.shape[0], -1)  # reshape each patch into a vector
-        return normalize(X)
-
+        X = PatchNormalizer(X).normalize_patches(X)
+        return X.reshape(X.shape[0], -1)
     return np.vstack([f(image) for image in images])
 
 
@@ -220,18 +267,18 @@ class PCANet(object):
         assert(np.ndim(images) == 3)  # input image must be grayscale
         assert(images.shape[1:3] == self.image_shape)
         n_images = images.shape[0]
-        patches = images_to_patches(images,
-                                    self.filter_shape_l1,
-                                    self.step_shape_l1)
+        patches = images_to_patch_vectors(images,
+                                          self.filter_shape_l1,
+                                          self.step_shape_l1)
         self.pca_l1.fit(patches)
 
         # images.shape == (L1, n_images, y, x)
         images = self.convolution_l1(images)
 
         # np.vstack(images).shape == (L1 * n_images, y, x)
-        patches = images_to_patches(np.vstack(images),
-                                    self.filter_shape_l2,
-                                    self.step_shape_l2)
+        patches = images_to_patch_vectors(np.vstack(images),
+                                          self.filter_shape_l2,
+                                          self.step_shape_l2)
         self.pca_l2.fit(patches)
         return self
 
