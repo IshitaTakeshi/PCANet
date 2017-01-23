@@ -141,7 +141,7 @@ class TestPCANet(unittest.TestCase):
         self.assertEqual(to_tuple_if_int((10, 10)), (10, 10))
 
     def test_patch_normalizer(self):
-        X = np.array([
+        patches = np.array([
             [[0, 2],
              [2, 1]],
             [[1, 3],
@@ -150,7 +150,7 @@ class TestPCANet(unittest.TestCase):
              [1, 2]]
         ])
 
-        normalizer = PatchNormalizer(X)
+        normalizer = PatchNormalizer(patches)
 
         expected = np.array([
             [[1, 2],
@@ -158,7 +158,8 @@ class TestPCANet(unittest.TestCase):
         ])
         assert_array_equal(normalizer.mean, expected)
 
-        p = np.array([
+        # normalize a patch by subtracting `normalizer.mean`
+        patch = np.array([
             [1, 3],
             [2, 1]
         ])
@@ -166,9 +167,10 @@ class TestPCANet(unittest.TestCase):
             [0, 1],
             [0, 0]
         ])
-        assert_array_equal(normalizer.normalize_patch(p), expected)
+        assert_array_equal(normalizer.normalize_patch(patch), expected)
 
-        P = np.array([
+        # normalize multiple patches
+        patches = np.array([
             [[0, 3],
              [1, 0]],
             [[1, 1],
@@ -180,7 +182,7 @@ class TestPCANet(unittest.TestCase):
             [[0, -1],
              [0, 2]]
         ])
-        assert_array_equal(normalizer.normalize_patches(P), expected)
+        assert_array_equal(normalizer.normalize_patches(patches), expected)
 
     def test_validate_structure(self):
         # Check whether filters visit all pixels of input images
