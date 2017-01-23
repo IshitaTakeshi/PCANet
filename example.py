@@ -31,35 +31,36 @@ def load_mnist():
     return data
 
 
-n_train = 1000
-n_test = 1000
+if __name__ == "__main__":
+    n_train = 1000
+    n_test = 1000
 
-train_set, valid_set, test_set = load_mnist()
+    train_set, valid_set, test_set = load_mnist()
 
-images_train, y_train = train_set
-images_test, y_test = test_set
+    images_train, y_train = train_set
+    images_test, y_test = test_set
 
-images_train, y_train = shuffle(images_train, y_train, random_state=0)
-images_train, y_train = images_train[:n_train], y_train[:n_train]
+    images_train, y_train = shuffle(images_train, y_train, random_state=0)
+    images_train, y_train = images_train[:n_train], y_train[:n_train]
 
-images_test, y_test = shuffle(images_test, y_test, random_state=0)
-images_test, y_test = images_test[:n_test], y_test[:n_test]
+    images_test, y_test = shuffle(images_test, y_test, random_state=0)
+    images_test, y_test = images_test[:n_test], y_test[:n_test]
 
 
-pcanet = PCANet(
-    image_shape=28,
-    filter_shape_l1=2, step_shape_l1=1, n_l1_output=4,
-    filter_shape_l2=2, step_shape_l2=1, n_l2_output=4,
-    block_shape=2
-)
-pcanet.validate_structure()
+    pcanet = PCANet(
+        image_shape=28,
+        filter_shape_l1=2, step_shape_l1=1, n_l1_output=4,
+        filter_shape_l2=2, step_shape_l2=1, n_l2_output=4,
+        block_shape=2
+    )
+    pcanet.validate_structure()
 
-pcanet.fit(images_train)
-X_train = pcanet.transform(images_train)
-X_test = pcanet.transform(images_test)
+    pcanet.fit(images_train)
+    X_train = pcanet.transform(images_train)
+    X_test = pcanet.transform(images_test)
 
-model = RandomForestClassifier(n_estimators=100, random_state=1234, n_jobs=-1)
-model.fit(X_train, y_train)
-y_pred = model.predict(X_test)
-accuracy = accuracy_score(y_test, y_pred)
-print("accuracy: " + str(accuracy))
+    model = RandomForestClassifier(n_estimators=100, random_state=1234, n_jobs=-1)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    print("accuracy: " + str(accuracy))
