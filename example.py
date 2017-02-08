@@ -32,8 +32,8 @@ def load_mnist():
 
 
 if __name__ == "__main__":
-    n_train = 1000
-    n_test = 1000
+    n_train = 40
+    n_test = 40
 
     train_set, valid_set, test_set = load_mnist()
 
@@ -47,17 +47,28 @@ if __name__ == "__main__":
     images_test, y_test = images_test[:n_test], y_test[:n_test]
 
 
-    pcanet = PCANet(
+    from ensemble import Bagging
+    model = Bagging(
+        n_estimators=400,
+        sampling_ratio=0.3,
+        n_jobs=4,
         image_shape=28,
         filter_shape_l1=2, step_shape_l1=1, n_l1_output=4,
         filter_shape_l2=2, step_shape_l2=1, n_l2_output=4,
-        block_shape=2
-    )
-    pcanet.validate_structure()
+        block_shape=2)
 
-    pcanet.fit(images_train)
-    X_train = pcanet.transform(images_train)
-    X_test = pcanet.transform(images_test)
+    # model.fit(images_train)
+    # pcanet = PCANet(
+    #     image_shape=28,
+    #     filter_shape_l1=2, step_shape_l1=1, n_l1_output=4,
+    #     filter_shape_l2=2, step_shape_l2=1, n_l2_output=4,
+    #     block_shape=2
+    # )
+    # pcanet.validate_structure()
+
+    model.fit(images_train)
+    X_train = model.transform(images_train)
+    X_test = model.transform(images_test)
 
     model = RandomForestClassifier(n_estimators=100, random_state=1234, n_jobs=-1)
     model.fit(X_train, y_train)

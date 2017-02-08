@@ -1,7 +1,6 @@
 # We recommend you to see [the original paper](https://arxiv.org/abs/1404.3606)
 # before reading the code below.
 
-# TODO use sphinx
 import itertools
 
 import numpy as np
@@ -51,7 +50,7 @@ class Patches(object):
         #     for i, x in enumerate(self.xs):
         #         yield j, i, self.image[y:y+sh, x:x+sw]
         # ```
-        # But the code above does not work when the second time calling,
+        # But the code above does not work at the second time calling,
         # so we create a generator object every time of function call.
         fh, fw = self.filter_shape
         it = itertools.product(enumerate(self.ys), enumerate(self.xs))
@@ -59,9 +58,7 @@ class Patches(object):
 
     @property
     def patches(self):
-        """
-        Return patches
-        """
+        """Return patches"""
         return np.array([p for j, i, p in self.patches_with_indices])
 
     @property
@@ -154,7 +151,6 @@ def convolution(images, filter_, filter_shape, step_shape):
 
 
 def convolutions(images, filters, filter_shape, step_shape):
-    # TODO use numpy.vectorize
     c = [convolution(images, f, filter_shape, step_shape) for f in filters]
     return np.array(c)
 
@@ -256,11 +252,7 @@ class PCANet(object):
         bins = np.linspace(-0.5, k - 0.5, self.n_bins)
 
         patches = Patches(binary_image, self.block_shape, self.block_shape)
-
-        hist = []
-        for patch in patches.patches:
-            h, _ = np.histogram(patch, bins)
-            hist.append(h)
+        hist = [np.histogram(patch, bins)[0] for patch in patches.patches]
         return np.concatenate(hist)
 
     def fit(self, images):
@@ -301,7 +293,8 @@ class PCANet(object):
             # maps.shape == (L2, n_images, y, x) right here
             maps = np.swapaxes(maps, 0, 1)
             # maps.shape == (n_images, L2, y, x)
-            x = [self.histogram(binarize(m)) for m in maps]
+            maps = [binarize(m) for m in maps]
+            x = [self.histogram(m) for m in maps]
             X.append(x)
         X = np.array(X)
         # transform X into the form (n_images, n_features).
@@ -315,7 +308,8 @@ class PCANet(object):
         """
         Check that the filter visits all pixels of input images without
         dropping any information.
-        Raise ValueError if the network structure does not satisfy the above constraint.
+        Raise ValueError if the network structure does not satisfy the
+        above constraint.
         """
         def is_valid_(input_shape, filter_shape, step_shape):
             ys, xs = steps(input_shape, filter_shape, step_shape)
