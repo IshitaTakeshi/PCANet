@@ -18,48 +18,6 @@ class TestPatches(unittest.TestCase):
         self.assertEqual(list(patches.ys), [0, 1, 2, 3, 4, 5, 6])
         self.assertEqual(list(patches.xs), [0, 2, 4])
 
-    def test_patches_with_indices(self):
-        # Supporse that an image below is geven.
-        # [0 1 2]
-        # [3 4 5]
-        # [6 7 8]
-        #
-        # If the patches are squares and its size = 2 and the step size = 1,
-        # then the extracted patches should be like below.
-        #
-        # (0, 0)th patch:
-        # [0 1]
-        # [3 4]
-        #
-        # (0, 1)th patch:
-        # [1 2]
-        # [4 5]
-        #
-        # (1, 0)th patch:
-        # [3 4]
-        # [6 7]
-        #
-        # (1, 1)th patch:
-        # [4 5]
-        # [7 8]
-
-        image = np.arange(9).reshape(3, 3)
-        patches = Patches(image, (2, 2), (1, 1))
-        expected_coordinates = [[0, 0], [0, 1], [1, 0], [1, 1]]
-        expected_patches = np.array([
-            [[0, 1],
-             [3, 4]],
-            [[1, 2],
-             [4, 5]],
-            [[3, 4],
-             [6, 7]],
-            [[4, 5],
-             [7, 8]]
-        ])
-        for index, (j, i, patch) in enumerate(patches.patches_with_indices):
-            self.assertEqual([j, i], expected_coordinates[index])
-            assert_array_equal(patch, expected_patches[index])
-
     def test_patches(self):
         # Supporse that an image below is geven.
         # [0 1 2]

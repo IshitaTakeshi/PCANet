@@ -9,10 +9,12 @@ from tqdm import tqdm
 
 
 def transform(estimator, images):
+    print("Transforming")
     return estimator.transform(images)
 
 
 def fit_random(estimator, images, sampling_ratio):
+    print("Fitting")
     n_images = images.shape[0]
     n_samples = int(n_images * sampling_ratio)
     indices = randint(0, n_images, n_samples)
@@ -43,6 +45,7 @@ class Bagging(object):
         self.n_jobs = n_jobs
 
     def fit(self, images):
+        print("Fitting the model")
         # run fit_random(estimator, images, sampling_ratio) in parallel
         args = zip(self.estimators,
                    repeat(images),
@@ -53,6 +56,7 @@ class Bagging(object):
         return self.estimators
 
     def transform(self, images):
+        print("Transforming images into features")
         # run transform(estimator, images) in parallel
         with Pool(self.n_jobs) as pool:
             X = pool.starmap(transform, zip(self.estimators, repeat(images)))

@@ -29,37 +29,11 @@ class Patches(object):
         self.ys, self.xs = steps(image.shape, filter_shape, step_shape)
 
     @property
-    def patches_with_indices(self):
-        """
-        Yields patches with its location indices.
-        Kernel visits the image from the left top into right bottom.
-
-        Yields
-        ------
-        j : int
-            Index of the patch along y axis
-        i : int
-            Index of the patch along x axis
-        patch : np.ndarray
-            (j, i)th patch
-        """
-
-        # The behaviour is same as below:
-        # ```
-        # for j, y in enumerate(self.ys):
-        #     for i, x in enumerate(self.xs):
-        #         yield j, i, self.image[y:y+sh, x:x+sw]
-        # ```
-        # But the code above does not work at the second time calling,
-        # so we create a generator object every time of function call.
-        fh, fw = self.filter_shape
-        it = itertools.product(enumerate(self.ys), enumerate(self.xs))
-        return ((j, i, self.image[y:y+fh, x:x+fw]) for (j, y), (i, x) in it)
-
-    @property
     def patches(self):
-        """Return patches"""
-        return np.array([p for j, i, p in self.patches_with_indices])
+        """Return image patches"""
+        fh, fw = self.filter_shape
+        it = itertools.product(self.ys, self.xs)
+        return np.array([self.image[y:y+fh, x:x+fw] for y, x in it])
 
     @property
     def output_shape(self):
@@ -139,15 +113,14 @@ def images_to_patch_vectors(images, filter_shape, step_shape):
     return np.vstack([f(image) for image in images])
 
 
-def convolution(images, filter_, filter_shape, step_shape):
-    def convolution_(patches):
-        L = np.empty(patches.output_shape)
-        for j, i, patch in patches.patches_with_indices:
-            L[j, i] = np.dot(filter_.flatten(), patch.flatten())
-        return L
+def convolution_(filter_, patches, output_shape):
+    # print(filter_.shape, patches.shape, output_shape)
+    return np.tensordot(patches, filter_, axes=2).reshape(output_shape)
 
+
+def convolution(images, filter_, filter_shape, step_shape):
     it = (Patches(image, filter_shape, step_shape) for image in images)
-    return np.array([convolution_(patches) for patches in it])
+    return np.array([convolution_(filter_, p.patches, p.output_shape) for p in it])
 
 
 def convolutions(images, filters, filter_shape, step_shape):
@@ -216,12 +189,14 @@ class PCANet(object):
         self.pca_l2 = PCA(n_l2_output)
 
     def convolution_l1(self, images):
-        return convolutions(images, self.pca_l1.components_,
+        filter_ = self.pca_l1.components_.reshape(-1, *self.filter_shape_l1)
+        return convolutions(images, filter_,
                             self.filter_shape_l1,
                             self.step_shape_l1)
 
     def convolution_l2(self, images):
-        return convolutions(images, self.pca_l2.components_,
+        filter_ = self.pca_l2.components_.reshape(-1, *self.filter_shape_l2)
+        return convolutions(images, filter_,
                             self.filter_shape_l2,
                             self.step_shape_l2)
 
