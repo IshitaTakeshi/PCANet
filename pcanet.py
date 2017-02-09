@@ -22,67 +22,44 @@ def output_shape(ys, xs):
 
 
 class Patches(object):
-    def __init__(self, image, filter_shape, step_shape):
-        self.image = image
+    def __init__(self, images, filter_shape, step_shape):
+        assert(np.ndim(images) == 3)
+        self.images = images
         self.filter_shape = filter_shape
 
-        self.ys, self.xs = steps(image.shape, filter_shape, step_shape)
+        self.ys, self.xs = steps(images.shape[1:3], filter_shape, step_shape)
 
     @property
     def patches(self):
-        """Return image patches"""
+        """
+        Return image patches of shape
+        (n_images, n_patches, filter_height, filter_width)
+        """
+        return np.array([self.patches_(image) for image in self.images])
+
+    def patches_(self, image):
         fh, fw = self.filter_shape
         it = itertools.product(self.ys, self.xs)
-        return np.array([self.image[y:y+fh, x:x+fw] for y, x in it])
+        return [image[y:y+fh, x:x+fw] for y, x in it]
 
     @property
     def output_shape(self):
         return output_shape(self.ys, self.xs)
 
 
-class PatchNormalizer(object):
+
+def normalize_patches(X):
     """
-    Class for Patch-mean removal
+    Normalize patches for each image.
+
+    Parameters
+    ----------
+    X: np.ndarray
+        Set of patches of shape
+        (n_images, n_patches, filter_height, filter_width)
     """
-
-    def __init__(self, patches):
-        """
-        Parameters
-        ----------
-        patches: np.ndarray
-            Set of patches which represented as a 3D array.
-        """
-
-        # mean.shape == (1, height, width)
-        self.mean = patches.mean(axis=0, keepdims=True)
-
-    def normalize_patch(self, patch):
-        """
-        Normalize a patch.
-
-        Parameters
-        ----------
-        patch: np.ndarray
-            A patch represented as a 2D array
-        """
-        return patch - self.mean[0]
-
-    def normalize_patches(self, patches):
-        """
-        Normalize patches.
-
-        Parameters
-        ----------
-        patch: np.ndarray
-            Set of patches represented as a 3D array
-        """
-        return patches - self.mean
-
-
-def heaviside_step(X):
-    X[X > 0] = 1
-    X[X <= 0] = 0
-    return X
+    assert(np.ndim(X) == 4)
+    return X - X.mean(axis=1, keepdims=True)
 
 
 def images_to_patch_vectors(images, filter_shape, step_shape):
@@ -106,33 +83,63 @@ def images_to_patch_vectors(images, filter_shape, step_shape):
     N is the number of images and
     M is the number of patches that can be obtained from one image.
     """
-    def f(image):
-        X = Patches(image, filter_shape, step_shape).patches
-        X = PatchNormalizer(X).normalize_patches(X)
-        return X.reshape(X.shape[0], -1)
-    return np.vstack([f(image) for image in images])
+    X = Patches(images, filter_shape, step_shape).patches
+    X = normalize_patches(X)
+    n_images, n_patches, filter_height, filter_width = X.shape
+    return X.reshape(n_images * n_patches, filter_height * filter_width)
 
 
-def convolution_(filter_, patches, output_shape):
-    # print(filter_.shape, patches.shape, output_shape)
-    return np.tensordot(patches, filter_, axes=2).reshape(output_shape)
+def convolution(images, filters, filter_shape, step_shape):
+    # filters : [n_filters, filter_height, filter_width]
+    # images  : [n_images, image_height, image_width]
+
+    patches = Patches(images, filter_shape, step_shape)
+
+    # the shape of patches.patches is
+    # (n_images, n_patches, filter_height, filter_width)
+    # and the the shape of filters is
+    # [n_filters, filter_height, filter_width].
+    # Run convolution by calculating products of patches and filters.
+    # The shape of convolution output `X` is
+    # (n_images, n_patches, n_filters)
+    # where n_patches = output_height * output_width.
+    X = np.tensordot(patches.patches, filters, axes=([2, 3], [1, 2]))
+
+    # Reshape X into (n_filters, n_images, n_patches)
+    X = np.swapaxes(X, 1, 2)
+    X = np.swapaxes(X, 0, 1)
+
+    # Here the shape of X is (n_filters, n_images, n_patches)
+    # At the last, reshape X into
+    # (n_filters, n_images, output_height, output_width)
+    return X.reshape(X.shape[0], X.shape[1], *patches.output_shape)
 
 
-def convolution(images, filter_, filter_shape, step_shape):
-    it = (Patches(image, filter_shape, step_shape) for image in images)
-    return np.array([convolution_(filter_, p.patches, p.output_shape) for p in it])
+def binarize(X):
+    X[X > 0] = 1
+    X[X <= 0] = 0
+    return X
 
 
-def convolutions(images, filters, filter_shape, step_shape):
-    c = [convolution(images, f, filter_shape, step_shape) for f in filters]
-    return np.array(c)
-
-
-def binarize(images):
-    output = np.zeros(images.shape[1:3])
-    for i, image in enumerate(reversed(images)):
-        output += np.power(2, i) * heaviside_step(image)
-    return output
+def binary_to_decimal(X):
+    """
+    Parameters
+    ----------
+    X: np.ndarray
+        Feature maps
+    """
+    # This function expects X of shape (n_images, L2, y, x)
+    # as an argument.
+    # Let's say that X[k] (0 <= k < n_images) can be represented like
+    # X[k] = [map_k[0], map_k[1], ..., map_k[L2-1]]
+    # where the shape of each map_k is (y, x).
+    # Then we calculate
+    # a[0] * map_k[0] + a[1] * map_k[1] + ... + a[L2-1] * map_k[L2-1]
+    # for each X[k], where a = [2^(L2-1), 2^(L2-2), ..., 2^0]
+    # Therefore, the output shape must be (n_images, y, x)
+    a = np.arange(X.shape[1])[::-1]
+    a = np.power(2, a)
+    return np.tensordot(X, a, axes=([1], [0]))
 
 
 def to_tuple_if_int(value):
@@ -189,18 +196,20 @@ class PCANet(object):
         self.pca_l2 = PCA(n_l2_output)
 
     def convolution_l1(self, images):
+        # (n_filters, filter_height*filter_width)
+        #   -> (n_filters, filter_height, filter_width)
         filter_ = self.pca_l1.components_.reshape(-1, *self.filter_shape_l1)
-        return convolutions(images, filter_,
-                            self.filter_shape_l1,
-                            self.step_shape_l1)
+        return convolution(images, filter_,
+                           self.filter_shape_l1,
+                           self.step_shape_l1)
 
     def convolution_l2(self, images):
         filter_ = self.pca_l2.components_.reshape(-1, *self.filter_shape_l2)
-        return convolutions(images, filter_,
-                            self.filter_shape_l2,
-                            self.step_shape_l2)
+        return convolution(images, filter_,
+                           self.filter_shape_l2,
+                           self.step_shape_l2)
 
-    def histogram(self, binary_image):
+    def histogram(self, binary_images):
         """
         Separate a given image into blocks and calculate a histogram
         in each block.
@@ -217,8 +226,9 @@ class PCANet(object):
         If default bins ``[-0.5 0.5 1.5 2.5 3.5]`` applied,
         then the histogram will be ``[2 1 4 2]``.
         If ``n_bins`` is specified, the range of data divided equally.
-        For example, if the data is in range ``[0, 3]`` and ``n_bins = 2``,
-        bins will be ``[-0.5 1.5 3.5]`` and the histogram will be ``[3 6]``.
+        For example, if the data is in range ``[0, 3]`` and
+        ``n_bins = 2``, bins will be ``[-0.5 1.5 3.5]`` and
+        the histogram will be ``[3 6]``.
         """
 
         k = pow(2, self.n_l2_output)
@@ -226,9 +236,16 @@ class PCANet(object):
             self.n_bins = k + 1
         bins = np.linspace(-0.5, k - 0.5, self.n_bins)
 
-        patches = Patches(binary_image, self.block_shape, self.block_shape)
-        hist = [np.histogram(patch, bins)[0] for patch in patches.patches]
-        return np.concatenate(hist)
+        def histogram(patches):
+            # Convert patches extracted from one image
+            # into a feature vector.
+            h = [np.histogram(patch, bins)[0] for patch in patches]
+            return np.concatenate(h)
+
+        patches = Patches(binary_images, self.block_shape, self.block_shape)
+        # The shape of patches.patches is
+        # (n_images, n_patches, filter_height, filter_width)
+        return np.array([histogram(p) for p in patches.patches])
 
     def fit(self, images):
         assert(np.ndim(images) == 3)  # input image must be grayscale
@@ -268,16 +285,15 @@ class PCANet(object):
             # maps.shape == (L2, n_images, y, x) right here
             maps = np.swapaxes(maps, 0, 1)
             # maps.shape == (n_images, L2, y, x)
-            maps = [binarize(m) for m in maps]
-            x = [self.histogram(m) for m in maps]
+            maps = binarize(maps)
+            maps = binary_to_decimal(maps)
+            # maps.shape == (n_images, y, x)
+            x = self.histogram(maps)
+            # x is a set of feature vectors.
+            # The shape of x is (n_images, vector length)
             X.append(x)
-        X = np.array(X)
-        # transform X into the form (n_images, n_features).
-        # now X.shape == (L1, n_images, n) where n is a value derived
-        # from block_shape and the dimensions of each histogram.
-        X = np.swapaxes(X, 0, 1)  # X.shape == (n_images, L1, n)
-        X = X.reshape(n_images, -1)  # flatten each subarray
-        return X.astype(np.float64)  # now X.shape == (n_images, L1*n)
+        X = np.hstack(X)
+        return X.astype(np.float64)
 
     def validate_structure(self):
         """

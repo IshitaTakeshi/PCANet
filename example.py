@@ -32,7 +32,7 @@ def load_mnist():
 
 if __name__ == "__main__":
     n_train = 2000
-    n_test = 40
+    n_test = 1000
 
     train_set, valid_set, test_set = load_mnist()
 
@@ -47,22 +47,22 @@ if __name__ == "__main__":
 
 
     from ensemble import Bagging
-    # model = Bagging(
-    #     n_estimators=10,
-    #     sampling_ratio=0.3,
-    #     n_jobs=4,
-    #     image_shape=28,
-    #     filter_shape_l1=2, step_shape_l1=1, n_l1_output=4,
-    #     filter_shape_l2=2, step_shape_l2=1, n_l2_output=4,
-    #     block_shape=2)
-
-    model = PCANet(
+    model = Bagging(
+        n_estimators=400,
+        sampling_ratio=0.3,
+        n_jobs=4,
         image_shape=28,
-        filter_shape_l1=4, step_shape_l1=2, n_l1_output=3,
-        filter_shape_l2=4, step_shape_l2=1, n_l2_output=3,
-        block_shape=5
-    )
-    model.validate_structure()
+        filter_shape_l1=2, step_shape_l1=1, n_l1_output=4,
+        filter_shape_l2=2, step_shape_l2=1, n_l2_output=4,
+        block_shape=2)
+
+    # model = PCANet(
+    #     image_shape=28,
+    #     filter_shape_l1=4, step_shape_l1=2, n_l1_output=3,
+    #     filter_shape_l2=4, step_shape_l2=1, n_l2_output=3,
+    #     block_shape=5
+    # )
+    # model.validate_structure()
 
     model.fit(images_train)
     X_train = model.transform(images_train)
