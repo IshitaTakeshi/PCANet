@@ -100,6 +100,23 @@ class TestPCANet(unittest.TestCase):
         ]])
         assert_array_equal(T, expected)
 
+        images = np.array([
+            [[1, 3, 2],
+             [4, 1, 5],
+             [3, 2, 6]]
+        ])
+        filter_shape = (2, 2)
+        filter_ = np.array([
+            [1, 2],
+            [3, 1]
+        ])
+        T = convolution(images, filter_, filter_shape, (1, 1))
+        expected = np.array([[
+            [20, 15],
+            [17, 23]
+        ]])
+        assert_array_equal(T, expected)
+
     def test_binarize(self):
         image = np.array([
             [[1, 1],
