@@ -255,6 +255,7 @@ class PCANet(object):
                                           self.filter_shape_l1,
                                           self.step_shape_l1)
         self.pca_l1.fit(patches)
+        del(patches)
 
         # images.shape == (L1, n_images, y, x)
         images = self.convolution_l1(images)
@@ -264,6 +265,7 @@ class PCANet(object):
                                           self.filter_shape_l2,
                                           self.step_shape_l2)
         self.pca_l2.fit(patches)
+        del(patches)
         return self
 
     def transform(self, images):
