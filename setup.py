@@ -11,6 +11,7 @@ setup(
         'numpy',
         'scipy',
         'scikit-learn',
+        'python-mnist',
         'sphinx',
         'recommonmark'
     ],
