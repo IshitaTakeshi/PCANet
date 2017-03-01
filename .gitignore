@@ -1,3 +1,7 @@
+# pickles
+
+*.pkl
+
 # dataset
 mnist.pkl.gz
 
