@@ -200,13 +200,8 @@ if __name__ == "__main__":
         "n_jobs": cpu_count()
     }
 
-    sampling_ratio_list = [
-        0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09,
-        0.1,
-    ]
-
-    for sampling_ratio in np.arange(0.01, 0.11, 0.01).astype(float):
-        for n_estimators in np.arange(10, 210, 10).astype(int):
+    for sampling_ratio in np.arange(0.01, 0.11, 0.01):
+        for n_estimators in np.arange(10, 210, 10):
             # convert from numpy object
             ensemble_params["n_estimators"] = int(n_estimators)
             ensemble_params["sampling_ratio"] = float(sampling_ratio)
