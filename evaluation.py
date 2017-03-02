@@ -165,6 +165,7 @@ def run_evaluation(datasize, estimator_params, ensemble_params):
     params["normal-model"] = filename
     params["normal-accuracy"] = accuracy
     params["normal-training-time"] = training_time
+    del(model)
 
     model, accuracy, training_time = run_pcanet_ensemble(
         ensemble_params, estimator_params,
@@ -176,6 +177,7 @@ def run_evaluation(datasize, estimator_params, ensemble_params):
     params["ensemble-model"] = filename
     params["ensemble-accuracy"] = accuracy
     params["ensemble-training-time"] = training_time
+    del(model)
 
     with open("result.json", "a") as f:
         json.dump(params, f, indent=2, sort_keys=True)
