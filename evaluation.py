@@ -45,7 +45,7 @@ def params_to_str(params):
 
 
 def run_classifier(X_train, X_test, y_train, y_test):
-    model = RandomForestClassifier(n_estimators=100, random_state=1234, n_jobs=-1)
+    model = LinearSVC(C=10)
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
     return y_test, y_pred
