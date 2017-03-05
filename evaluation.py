@@ -181,7 +181,14 @@ def concatenate_dicts(*dicts):
     return dict(merged)
 
 
+def export_json(result, filename):
+    with open(filename, "a") as f:
+        json.dump(result, f, sort_keys=True, indent=2)
+
+
 if __name__ == "__main__":
+    filename = "result.json"
+
     datasize = {
         "n_train": None,
         "n_test": None
@@ -199,18 +206,24 @@ if __name__ == "__main__":
     )
 
     train_set, test_set = load_mnist()
-    train_set, test_set = pick(train_set, test_set,
-                               datasize["n_train"], datasize["n_test"])
+    # train_set, test_set = pick(train_set, test_set,
+    #                            datasize["n_train"], datasize["n_test"])
 
-    normal_params = hyperparameters
-    normal_result = evaluate_normal(train_set, test_set, transformer_params)
-    print(concatenate_dicts(normal_params, normal_result))
+    result = evaluate_normal(train_set, test_set, transformer_params)
+    result = concatenate_dicts(hyperparameters, result)
+    result["type"] = "normal"
+    export_json(result, filename)
+    print(result)
+
     for sampling_ratio in np.arange(0.01, 0.11, 0.01):
         for n_estimators in np.arange(10, 210, 10):
             ensemble_params = hyperparameters
             ensemble_params["n_estimators"] = int(n_estimators)
             ensemble_params["sampling_ratio"] = float(sampling_ratio)
             ensemble_params["n_jobs"] = cpu_count()
-            ensemble_result = evaluate_ensemble(
-                    train_set, test_set, ensemble_params, transformer_params)
-            print(concatenate_dicts(ensemble_params, ensemble_result))
+            result = evaluate_ensemble(train_set, test_set,
+                                       ensemble_params, transformer_params)
+            result = concatenate_dicts(hyperparameters, result)
+            result["type"] = "ensemble"
+            export_json(result, filename)
+            print(result)
