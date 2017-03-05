@@ -4,7 +4,7 @@ from numpy.testing import assert_array_equal
 
 from pcanet import Patches, PCANet, normalize_patches, convolution, binarize
 from pcanet import binary_to_decimal, to_tuple_if_int
-
+from ensemble import most_frequent_label
 
 class TestPatches(unittest.TestCase):
     def test_kernel_startpoints(self):
@@ -251,5 +251,15 @@ class TestPCANet(unittest.TestCase):
             block_shape=3
         )
         self.assertRaises(ValueError, pcanet.validate_structure)
+
+
+class TestBagging(unittest.TestCase):
+    def test_most_frequent_label(self):
+        v = np.array([0, 1, 1, 3, 2, 0, 1])
+        self.assertEqual(most_frequent_label(v), 1)
+
+        v = np.array([0, 2, 1, 2, 2, 1, 0])
+        self.assertEqual(most_frequent_label(v), 2)
+
 
 unittest.main()
