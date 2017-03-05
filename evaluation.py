@@ -22,6 +22,9 @@ from pcanet import PCANet
 from ensemble import Bagging
 
 
+pickle_dir = "pickles"
+
+
 def load_mnist():
     mnist = MNIST("mnist")
     X_train, y_train = mnist.load_training()
@@ -48,9 +51,9 @@ def run_classifier(X_train, X_test, y_train, y_test):
     return y_test, y_pred
 
 
-def run_pcanet_normal(estimator_params,
+def run_pcanet_normal(transformer_params,
                       images_train, images_test, y_train, y_test):
-    model = PCANet(**estimator_params)
+    model = PCANet(**transformer_params)
     model.validate_structure()
 
     t1 = timeit.default_timer()
@@ -68,23 +71,21 @@ def run_pcanet_normal(estimator_params,
 
 
 # TODO Change n_estimators and sampling_ratio on evaluation
-def run_pcanet_ensemble(ensemble_params, estimator_params,
+def run_pcanet_ensemble(ensemble_params, transformer_params,
                         images_train, images_test, y_train, y_test):
     model = Bagging(
-        n_estimators=ensemble_params["n_estimators"],
-        sampling_ratio=ensemble_params["sampling_ratio"],
-        n_jobs=ensemble_params["n_jobs"],
-        **estimator_params)
+        ensemble_params["n_estimators"],
+        ensemble_params["sampling_ratio"],
+        ensemble_params["n_jobs"],
+        **transformer_params)
 
     t1 = timeit.default_timer()
-    model.fit(images_train)
+    model.fit(images_train, y_train)
     t2 = timeit.default_timer()
     training_time = t2 - t1
 
-    X_train = model.transform(images_train)
-    X_test = model.transform(images_test)
+    y_pred = model.predict(images_test)
 
-    y_test, y_pred = run_classifier(X_train, X_test, y_train, y_test)
     accuracy = accuracy_score(y_test, y_pred)
 
     return model, accuracy, training_time
@@ -136,51 +137,48 @@ def pick(train_set, test_set, n_train, n_test):
     return train_set, test_set
 
 
-def run_evaluation(datasize, estimator_params, ensemble_params):
-    # params = vars(parse_args())
-
-    pickle_dir = "pickles"
-
-    n_train, n_test = datasize["n_train"], datasize["n_test"]
-
-    train_set, test_set = load_mnist()
-    train_set, test_set = pick(train_set, test_set, n_train, n_test)
+def evaluate_ensemble(train_set, test_set,
+                      ensemble_params, transformer_params):
     (images_train, y_train), (images_test, y_test) = train_set, test_set
 
-    params = dict(
-        list(estimator_params.items()) +
-        list(ensemble_params.items())
-    )
-
-    params["n_train"] = n_train
-    params["n_test"] = n_test
-
-    model, accuracy, training_time = run_pcanet_normal(
-        estimator_params,
-        images_train, images_test, y_train, y_test
-    )
-
-    filename = model_filename()
-    save_model(model, join(pickle_dir, filename))
-    params["normal-model"] = filename
-    params["normal-accuracy"] = accuracy
-    params["normal-training-time"] = training_time
-    del(model)
-
     model, accuracy, training_time = run_pcanet_ensemble(
-        ensemble_params, estimator_params,
+        ensemble_params, transformer_params,
         images_train, images_test, y_train, y_test
     )
 
     filename = model_filename()
     save_model(model, join(pickle_dir, filename))
+
+    params = {}
     params["ensemble-model"] = filename
     params["ensemble-accuracy"] = accuracy
     params["ensemble-training-time"] = training_time
-    del(model)
+    return params
 
-    with open("result.json", "a") as f:
-        json.dump(params, f, indent=2, sort_keys=True)
+
+def evaluate_normal(train_set, test_set, transformer_params):
+    (images_train, y_train), (images_test, y_test) = train_set, test_set
+
+    model, accuracy, training_time = run_pcanet_normal(
+        transformer_params,
+        images_train, images_test, y_train, y_test
+    )
+
+    filename = model_filename()
+    save_model(model, join(pickle_dir, filename))
+
+    params = {}
+    params["normal-model"] = filename
+    params["normal-accuracy"] = accuracy
+    params["normal-training-time"] = training_time
+    return params
+
+
+def concatenate_dicts(*dicts):
+    merged = []
+    for d in dicts:
+        merged += list(d.items())
+    return dict(merged)
 
 
 if __name__ == "__main__":
@@ -188,21 +186,31 @@ if __name__ == "__main__":
         "n_train": None,
         "n_test": None
     }
-    estimator_params = {
+    transformer_params = {
         "image_shape": 28,
         "filter_shape_l1": 4, "step_shape_l1": 2, "n_l1_output": 3,
         "filter_shape_l2": 4, "step_shape_l2": 1, "n_l2_output": 3,
         "block_shape": 5
     }
-    ensemble_params = {
-        "n_estimators": 10,
-        "sampling_ratio": 0.3,
-        "n_jobs": cpu_count()
-    }
 
+    hyperparameters = concatenate_dicts(
+        datasize,
+        transformer_params,
+    )
+
+    train_set, test_set = load_mnist()
+    train_set, test_set = pick(train_set, test_set,
+                               datasize["n_train"], datasize["n_test"])
+
+    normal_params = hyperparameters
+    normal_result = evaluate_normal(train_set, test_set, transformer_params)
+    print(concatenate_dicts(normal_params, normal_result))
     for sampling_ratio in np.arange(0.01, 0.11, 0.01):
         for n_estimators in np.arange(10, 210, 10):
-            # convert from numpy object
+            ensemble_params = hyperparameters
             ensemble_params["n_estimators"] = int(n_estimators)
             ensemble_params["sampling_ratio"] = float(sampling_ratio)
-            run_evaluation(datasize, estimator_params, ensemble_params)
+            ensemble_params["n_jobs"] = cpu_count()
+            ensemble_result = evaluate_ensemble(
+                    train_set, test_set, ensemble_params, transformer_params)
+            print(concatenate_dicts(ensemble_params, ensemble_result))
