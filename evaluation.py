@@ -214,16 +214,3 @@ if __name__ == "__main__":
     result["type"] = "normal"
     export_json(result, filename)
     print(result)
-
-    for sampling_ratio in np.arange(0.01, 0.11, 0.01):
-        for n_estimators in np.arange(10, 210, 10):
-            ensemble_params = hyperparameters
-            ensemble_params["n_estimators"] = int(n_estimators)
-            ensemble_params["sampling_ratio"] = float(sampling_ratio)
-            ensemble_params["n_jobs"] = cpu_count()
-            result = evaluate_ensemble(train_set, test_set,
-                                       ensemble_params, transformer_params)
-            result = concatenate_dicts(hyperparameters, result)
-            result["type"] = "ensemble"
-            export_json(result, filename)
-            print(result)
