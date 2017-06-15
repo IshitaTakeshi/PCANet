@@ -6,7 +6,6 @@ from sklearn.externals.joblib import Parallel, delayed
 from numpy.random import randint
 from pcanet import PCANet
 import numpy as np
-from tqdm import tqdm
 
 
 def most_frequent_label(v):
