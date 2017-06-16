@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_array_equal
 
-from pcanet import Patches, PCANet, normalize_patches, convolution, binarize
+from pcanet import Patches, PCANet, remove_patch_mean, convolution, binarize
 from pcanet import binary_to_decimal, to_tuple_if_int
 from ensemble import most_frequent_label
 
@@ -14,55 +14,38 @@ class TestPatches(unittest.TestCase):
         image_shape = (10, 8)
         filter_shape = (4, 3)
         step_shape = (1, 2)
-        images = np.zeros((1, *image_shape))
-        patches = Patches(images, filter_shape, step_shape)
+        image = np.zeros(image_shape)
+        patches = Patches(image, filter_shape, step_shape)
         self.assertEqual(list(patches.ys), [0, 1, 2, 3, 4, 5, 6])
         self.assertEqual(list(patches.xs), [0, 2, 4])
 
     def test_patches(self):
-        # Supporse that images below aregeven.
+        # Supporse that image below is geven.
         # [[0 1 2]
         #  [3 4 5]
         #  [6 7 8]]
-        # [[0 3 1]
-        #  [3 1 1]
-        #  [2 0 0]]
         #
         # If the patches are squares and its size = 2, and the step size = 1
-        # then the extracted patches should be like below.
-        # From the first image:
+        # the extracted patches should be like below.
         # [0 1]  [1 2]  [3 4]  [4 5]
         # [3 4]  [4 5]  [6 7]  [7 8]
-        # From the second image:
-        # [0 3]  [3 1]  [3 1]  [1 1]
-        # [3 1]  [1 1]  [2 0]  [0 0]
-        images = np.array([
-         [[0, 1, 2],
-          [3, 4, 5],
-          [6, 7, 8]],
+
+        image = np.array(
          [[0, 3, 1],
           [3, 1, 1],
           [2, 0, 0]]
-        ])
+        )
 
-        patches = Patches(images, (2, 2), (1, 1)).patches
+        patches = Patches(image, (2, 2), (1, 1)).patches
         expected = np.array([
-            [[[0, 1],
-              [3, 4]],
-             [[1, 2],
-              [4, 5]],
-             [[3, 4],
-              [6, 7]],
-             [[4, 5],
-              [7, 8]]],
-            [[[0, 3],
-              [3, 1]],
-             [[3, 1],
-              [1, 1]],
-             [[3, 1],
-              [2, 0]],
-             [[1, 1],
-              [0, 0]]],
+            [[0, 3],
+             [3, 1]],
+            [[3, 1],
+             [1, 1]],
+            [[3, 1],
+             [2, 0]],
+            [[1, 1],
+             [0, 0]]
         ])
         assert_array_equal(patches, expected)
 
@@ -174,28 +157,18 @@ class TestPCANet(unittest.TestCase):
         # do nothing if non-integer is given
         self.assertEqual(to_tuple_if_int((10, 10)), (10, 10))
 
-    def test_normalize_patches(self):
+    def test_remove_patch_mean(self):
         patches = np.array([
-            [[[0, 3],
-              [1, 5]],
-             [[2, 1],
-              [1, 1]]],
-            [[[1, 3],
-              [0, 2]],
-             [[1, 1],
-              [2, 2]]]
+            [0, 2, 1, 5],
+            [2, 0, 1, 1],
+            [3, 3, 0, 2],
         ])
         expected = np.array([
-            [[[-1, 1],
-              [0, 2]],
-             [[1, -1],
-              [0, -2]]],
-            [[[0, 1],
-              [-1, 0]],
-             [[0, -1],
-              [1, 0]]]
+            [-2, 0, -1, 3],
+            [1, -1, 0, 0],
+            [1, 1, -2, 0],
         ])
-        assert_array_equal(normalize_patches(patches), expected)
+        assert_array_equal(remove_patch_mean(patches), expected)
 
     def test_validate_structure(self):
         # Check whether filters visit all pixels of input images

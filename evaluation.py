@@ -190,8 +190,8 @@ if __name__ == "__main__":
     filename = "result.json"
 
     datasize = {
-        "n_train": None,
-        "n_test": None
+        "n_train": 20,
+        "n_test": 20
     }
     transformer_params = {
         "image_shape": 28,
@@ -206,8 +206,8 @@ if __name__ == "__main__":
     )
 
     train_set, test_set = load_mnist()
-    # train_set, test_set = pick(train_set, test_set,
-    #                            datasize["n_train"], datasize["n_test"])
+    train_set, test_set = pick(train_set, test_set,
+                               datasize["n_train"], datasize["n_test"])
 
     result = evaluate_normal(train_set, test_set, transformer_params)
     result = concatenate_dicts(hyperparameters, result)

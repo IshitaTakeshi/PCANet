@@ -4,7 +4,7 @@
 import itertools
 
 import numpy as np
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, IncrementalPCA
 
 
 def steps(image_shape, filter_shape, step_shape):
@@ -22,52 +22,48 @@ def output_shape(ys, xs):
 
 
 class Patches(object):
-    def __init__(self, images, filter_shape, step_shape):
-        assert(np.ndim(images) == 3)
-        self.images = images
+    def __init__(self, image, filter_shape, step_shape):
+        assert(np.ndim(image) == 2)
+        self.image = image
         self.filter_shape = filter_shape
 
-        self.ys, self.xs = steps(images.shape[1:3], filter_shape, step_shape)
+        self.ys, self.xs = steps(image.shape[0:2], filter_shape, step_shape)
 
     @property
     def patches(self):
         """
         Return image patches of shape
-        (n_images, n_patches, filter_height, filter_width)
+        (n_patches, filter_height, filter_width)
         """
-        return np.array([self.patches_(image) for image in self.images])
-
-    def patches_(self, image):
         fh, fw = self.filter_shape
         it = itertools.product(self.ys, self.xs)
-        return [image[y:y+fh, x:x+fw] for y, x in it]
+        return np.array([self.image[y:y+fh, x:x+fw] for y, x in it])
 
     @property
     def output_shape(self):
         return output_shape(self.ys, self.xs)
 
 
-
-def normalize_patches(X):
+def remove_patch_mean(X):
     """
-    Normalize patches for each image.
+    Remove mean from each patch.
 
     Parameters
     ----------
     X: np.ndarray
         Set of patches of shape
-        (n_images, n_patches, filter_height, filter_width)
+        (n_patches, filter_height*filter_width)
     """
-    assert(np.ndim(X) == 4)
+    assert(np.ndim(X) == 2)
     return X - X.mean(axis=1, keepdims=True)
 
 
-def images_to_patch_vectors(images, filter_shape, step_shape):
+def image_to_patch_vectors(image, filter_shape, step_shape):
     """
     Parameters
     ----------
-    images: np.array
-        Images to extract patch vectors
+    image: np.array
+        Image to extract patch vectors
     filter_shape: tuple of ints
         The shape of a filter
     step_shape: tuple of ints
@@ -77,34 +73,33 @@ def images_to_patch_vectors(images, filter_shape, step_shape):
     -------
     X: np.array
         A set of normalized and flattened patches
-
-    Each row of X represents a flattened patch.
-    The number of columns is N x M where
-    N is the number of images and
-    M is the number of patches that can be obtained from one image.
     """
-    X = Patches(images, filter_shape, step_shape).patches
-    X = normalize_patches(X)
-    n_images, n_patches, filter_height, filter_width = X.shape
-    return X.reshape(n_images * n_patches, filter_height * filter_width)
+    X = Patches(image, filter_shape, step_shape).patches
+    X = X.reshape(n_patches, filter_height * filter_width)
+    X = remove_patch_mean(X)
+    return X
 
 
 def convolution(images, filters, filter_shape, step_shape):
     # filters : [n_filters, filter_height, filter_width]
     # images  : [n_images, image_height, image_width]
 
-    patches = Patches(images, filter_shape, step_shape)
+    X = []
+    for image in images:
+        # the shape of patches.patches is
+        # (n_patches, filter_height, filter_width)
+        # and the the shape of filters is
+        # [n_filters, filter_height, filter_width].
+        # Run convolution by calculating products of patches and filters.
+        # The shape of convolution output is
+        # (n_patches, n_filters)
+        # where n_patches = output_height * output_width.
+        patches = Patches(image, filter_shape, step_shape)
+        x = np.tensordot(patches.patches, filters, axes=([1, 2], [1, 2]))
+        X.append(x)
+    X = np.array(X)
 
-    # the shape of patches.patches is
-    # (n_images, n_patches, filter_height, filter_width)
-    # and the the shape of filters is
-    # [n_filters, filter_height, filter_width].
-    # Run convolution by calculating products of patches and filters.
-    # The shape of convolution output `X` is
-    # (n_images, n_patches, n_filters)
-    # where n_patches = output_height * output_width.
-    X = np.tensordot(patches.patches, filters, axes=([2, 3], [1, 2]))
-
+    # Here, the shape of X is (n_images, n_patches, n_filters)
     # Reshape X into (n_filters, n_images, n_patches)
     X = np.swapaxes(X, 1, 2)
     X = np.swapaxes(X, 0, 1)
@@ -192,8 +187,8 @@ class PCANet(object):
         self.block_shape = to_tuple_if_int(block_shape)
         self.n_bins = None  # TODO make n_bins specifiable
 
-        self.pca_l1 = PCA(n_l1_output)
-        self.pca_l2 = PCA(n_l2_output)
+        self.pca_l1 = IncrementalPCA(n_l1_output)
+        self.pca_l2 = IncrementalPCA(n_l2_output)
 
     def convolution_l1(self, images):
         # (n_filters, filter_height*filter_width)
@@ -236,36 +231,33 @@ class PCANet(object):
             self.n_bins = k + 1
         bins = np.linspace(-0.5, k - 0.5, self.n_bins)
 
-        def histogram(patches):
+        def histogram(image):
             # Convert patches extracted from one image
             # into a feature vector.
-            h = [np.histogram(patch, bins)[0] for patch in patches]
-            return np.concatenate(h)
-
-        patches = Patches(binary_images, self.block_shape, self.block_shape)
-        # The shape of patches.patches is
-        # (n_images, n_patches, filter_height, filter_width)
-        return np.array([histogram(p) for p in patches.patches])
+            patches = Patches(image, self.block_shape, self.block_shape)
+            h = [np.histogram(p, bins)[0] for p in patches.patches]
+            return np.concatenate(h)  # Bhist(T) in the original paper
+        return np.array([histogram(image) for image in binary_images])
 
     def fit(self, images):
         assert(np.ndim(images) == 3)  # input image must be grayscale
         assert(images.shape[1:3] == self.image_shape)
-        n_images = images.shape[0]
-        patches = images_to_patch_vectors(images,
-                                          self.filter_shape_l1,
-                                          self.step_shape_l1)
-        self.pca_l1.fit(patches)
-        del(patches)
+        for image in images:
+            patches = image_to_patch_vectors(image,
+                                             self.filter_shape_l1,
+                                             self.step_shape_l1)
+            self.pca_l1.partial_fit(patches)
 
         # images.shape == (L1, n_images, y, x)
         images = self.convolution_l1(images)
+        h, w = images.shape[2:4]
+        images = images.reshape(-1, h, w)
 
-        # np.vstack(images).shape == (L1 * n_images, y, x)
-        patches = images_to_patch_vectors(np.vstack(images),
-                                          self.filter_shape_l2,
-                                          self.step_shape_l2)
-        self.pca_l2.fit(patches)
-        del(patches)
+        for image in images:
+            patches = image_to_patch_vectors(image,
+                                             self.filter_shape_l2,
+                                             self.step_shape_l2)
+            self.pca_l2.partial_fit(patches)
         return self
 
     def transform(self, images):
@@ -295,6 +287,8 @@ class PCANet(object):
             # The shape of x is (n_images, vector length)
             X.append(x)
         X = np.hstack(X)
+        # concatenate over L1
+        # The shape of X is (n_images, L1 * vector length)
         return X.astype(np.float64)
 
     def validate_structure(self):
