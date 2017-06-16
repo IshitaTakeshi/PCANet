@@ -1,13 +1,15 @@
+import os
 from os.path import exists, join
 import pickle
 import json
 import gzip
-from urllib.request import urlretrieve
 from argparse import ArgumentParser
 import hashlib
 import time
 import timeit
 from multiprocessing import cpu_count
+from urllib.request import urlopen
+import tarfile
 
 import numpy as np
 from mnist import MNIST
@@ -23,6 +25,51 @@ from ensemble import Bagging
 
 
 pickle_dir = "pickles"
+data_dir = "data"
+
+
+def load_cifar():
+    cifar_dir = join(data_dir, "cifar")
+    if not exists(cifar_dir):
+        os.makedirs(cifar_dir)
+
+    def download(path):
+        print("Downloading")
+        url = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
+        response = urlopen(url)
+        content = response.read()
+        with open(path, "w") as f:
+            f.write(content)
+        print("Finished")
+
+    def extract(path):
+        with tarfile.open(path) as f:
+            f.extractall(path=cifar_dir)
+
+    def load():
+        def load_batch(i):
+            filename = "data_batch_" + str(i)
+            p = join(cifar_dir, "cifar-10-batches-py", filename)
+            with open(p, "rb") as f:
+                d = pickle.load(f, encoding="bytes")
+            return d
+
+        X = []
+        y = []
+        for i in range(1, 6):
+            d = load_batch(i)
+            X_, y_ = d[b"data"], d[b"labels"]
+            X.append(X_)
+            y += y_
+        X = np.vstack(X)
+        return X, y
+
+    path = join(cifar_dir, "cifar-10-python.tar.gz")
+    if not exists(path):
+        download(path)
+        extract(path)
+    X, y = load()
+    return X, y
 
 
 def load_mnist():
