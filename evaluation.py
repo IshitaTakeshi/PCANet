@@ -70,7 +70,6 @@ def run_pcanet_normal(transformer_params,
     return model, accuracy, training_time
 
 
-# TODO Change n_estimators and sampling_ratio on evaluation
 def run_pcanet_ensemble(ensemble_params, transformer_params,
                         images_train, images_test, y_train, y_test):
     model = Bagging(
