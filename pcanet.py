@@ -75,11 +75,12 @@ def image_to_patch_vectors(image, filter_shape, step_shape):
         A set of normalized and flattened patches
     """
     X = Patches(image, filter_shape, step_shape).patches
-    X = X.reshape(n_patches, filter_height * filter_width)
+    X = X.reshape(X.shape[0], -1)  # flatten each patch
     X = remove_patch_mean(X)
     return X
 
 
+@profile
 def convolution(images, filters, filter_shape, step_shape):
     # filters : [n_filters, filter_height, filter_width]
     # images  : [n_images, image_height, image_width]
@@ -239,6 +240,7 @@ class PCANet(object):
             return np.concatenate(h)  # Bhist(T) in the original paper
         return np.array([histogram(image) for image in binary_images])
 
+    @profile
     def fit(self, images):
         assert(np.ndim(images) == 3)  # input image must be grayscale
         assert(images.shape[1:3] == self.image_shape)
@@ -260,6 +262,7 @@ class PCANet(object):
             self.pca_l2.partial_fit(patches)
         return self
 
+    @profile
     def transform(self, images):
         assert(np.ndim(images) == 3)  # input image must be grayscale
         assert(images.shape[1:3] == self.image_shape)
