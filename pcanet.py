@@ -147,7 +147,7 @@ def to_tuple_if_int(value):
     return value
 
 
-class PCANet(object):
+class BasePCANet(object):
     def __init__(self, image_shape,
                  filter_shape_l1, step_shape_l1, n_l1_output,
                  filter_shape_l2, step_shape_l2, n_l2_output,
@@ -316,3 +316,51 @@ class PCANet(object):
                                     self.filter_shape_l2,
                                     self.step_shape_l2)
         is_valid_(output_shape_l2, self.block_shape, self.block_shape)
+
+
+
+class PCANet(object):
+    def __init__(self, **kwargs):
+        self.pcanet_params = kwargs
+        self.pcanets = []
+
+    def atleast_4d(self, images):
+        """Regard gray-scale images as 1-channel images"""
+        assert(np.ndim(images) == 3)
+        return images.reshape(*images.shape, 1)
+
+    def fit(self, images):
+        assert(np.ndim(images) >= 3)
+
+        if np.ndim(images) == 3:
+            # forcibly convert to multi-channel images
+            images = self.atleast_4d(images)
+
+        n_channels = images.shape[3]
+
+        self.pcanets = \
+            [BasePCANet(**self.pcanet_params) for i in range(n_channels)]
+
+        for i in range(n_channels):
+            # images.shape == (n_images, y, x, n_channels)
+            self.pcanets[i].fit(images[:, :, :, i])
+
+    def transform(self, images):
+        assert(np.ndim(images) >= 3)
+
+        if np.ndim(images) == 3:
+            images = self.atleast_4d(images)
+
+        n_channels = images.shape[3]
+
+        X = []
+        for i in range(n_channels):
+            x = self.pcanets[i].transform(images[:, :, :, i])
+            X.append(x)
+        X = np.hstack(X)
+        return X.astype(np.float64)
+
+    def validate_structure(self):
+        for pcanet in self.pcanets:
+            pcanet.validate_structure()
+

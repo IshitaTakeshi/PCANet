@@ -38,7 +38,7 @@ def load_cifar():
         url = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
         response = urlopen(url)
         content = response.read()
-        with open(path, "w") as f:
+        with open(path, "wb") as f:
             f.write(content)
         print("Finished")
 
@@ -46,30 +46,37 @@ def load_cifar():
         with tarfile.open(path) as f:
             f.extractall(path=cifar_dir)
 
-    def load():
-        def load_batch(i):
-            filename = "data_batch_" + str(i)
-            p = join(cifar_dir, "cifar-10-batches-py", filename)
-            with open(p, "rb") as f:
-                d = pickle.load(f, encoding="bytes")
-            return d
+    def load_batch(filename):
+        p = join(cifar_dir, "cifar-10-batches-py", filename)
+        with open(p, "rb") as f:
+            d = pickle.load(f, encoding="bytes")
+        return d
 
+    def load_train():
         X = []
         y = []
         for i in range(1, 6):
-            d = load_batch(i)
+            d = load_batch("data_batch_" + str(i))
             X_, y_ = d[b"data"], d[b"labels"]
             X.append(X_)
             y += y_
         X = np.vstack(X)
+        X = X.reshape(-1, 32, 32, 3)
+        return X, y
+
+    def load_test():
+        d = load_batch("test_batch")
+        X, y = d[b"data"], d[b"labels"]
+        X = X.reshape(-1, 32, 32, 3)
         return X, y
 
     path = join(cifar_dir, "cifar-10-python.tar.gz")
     if not exists(path):
         download(path)
-        extract(path)
-    X, y = load()
-    return X, y
+    extract(path)
+    train_set = load_train()
+    test_set = load_test()
+    return train_set, test_set
 
 
 def load_mnist():
@@ -232,31 +239,47 @@ def export_json(result, filename):
         json.dump(result, f, sort_keys=True, indent=2)
 
 
-if __name__ == "__main__":
-    filename = "result.json"
+def run(dataset, datasize, transformer_params, filename="result.json"):
+    train_set, test_set = dataset
 
-    datasize = {
-        "n_train": 20,
-        "n_test": 20
+    train_set, test_set = pick(train_set, test_set,
+                               datasize["n_train"], datasize["n_test"])
+
+    # Set the actual data size
+    datasize["n_train"], datasize["n_test"] = len(train_set[1]), len(test_set[1])
+
+    hyperparameters = concatenate_dicts(datasize, transformer_params)
+    result = evaluate_normal(train_set, test_set, transformer_params)
+    result = concatenate_dicts(hyperparameters, result)
+    result["type"] = "normal"
+    export_json(result, filename)
+    print(result)
+
+
+def run_cifar(n_train=None, n_test=None):
+    datasize = {"n_train": n_train, "n_test": n_test}
+    transformer_params = {
+        "image_shape": 32,
+        "filter_shape_l1": 4, "step_shape_l1": 2, "n_l1_output": 3,
+        "filter_shape_l2": 2, "step_shape_l2": 1, "n_l2_output": 3,
+        "block_shape": 7
     }
+    dataset = load_cifar()
+    run(dataset, datasize, transformer_params)
+
+
+def run_mnist(n_train=None, n_test=None):
+    datasize = {"n_train": n_train, "n_test": n_test}
     transformer_params = {
         "image_shape": 28,
         "filter_shape_l1": 4, "step_shape_l1": 2, "n_l1_output": 3,
         "filter_shape_l2": 4, "step_shape_l2": 1, "n_l2_output": 3,
         "block_shape": 5
     }
+    dataset = load_mnist()
+    run(dataset, datasize, transformer_params)
 
-    hyperparameters = concatenate_dicts(
-        datasize,
-        transformer_params,
-    )
 
-    train_set, test_set = load_mnist()
-    train_set, test_set = pick(train_set, test_set,
-                               datasize["n_train"], datasize["n_test"])
-
-    result = evaluate_normal(train_set, test_set, transformer_params)
-    result = concatenate_dicts(hyperparameters, result)
-    result["type"] = "normal"
-    export_json(result, filename)
-    print(result)
+if __name__ == "__main__":
+    run_mnist(n_train=None, n_test=None)
+    run_cifar(n_train=None, n_test=None)
