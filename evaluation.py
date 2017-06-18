@@ -281,5 +281,5 @@ def run_mnist(n_train=None, n_test=None):
 
 
 if __name__ == "__main__":
-    run_mnist(n_train=None, n_test=None)
-    run_cifar(n_train=None, n_test=None)
+    run_mnist(n_train=200, n_test=200)
+    # run_cifar(n_train=200, n_test=200)

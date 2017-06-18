@@ -8,6 +8,7 @@ setup(
     author="Takeshi Ishita",
     py_modules=["pcanet"],
     install_requires=[
+        'chainer',
         'numpy',
         'psutil',
         'python-mnist',

@@ -3,6 +3,7 @@
 
 import itertools
 
+from chainer.functions import convolution_2d
 import numpy as np
 from sklearn.decomposition import PCA, IncrementalPCA
 
@@ -44,18 +45,29 @@ class Patches(object):
         return output_shape(self.ys, self.xs)
 
 
-def remove_patch_mean(X):
-    """
-    Remove mean from each patch.
+def atleast_4d(images):
+    """Regard gray-scale images as 1-channel images"""
+    assert(np.ndim(images) == 3)
+    return images.reshape(*images.shape, 1)
 
-    Parameters
-    ----------
-    X: np.ndarray
-        Set of patches of shape
-        (n_patches, filter_height*filter_width)
-    """
-    assert(np.ndim(X) == 2)
-    return X - X.mean(axis=1, keepdims=True)
+
+def to_channels_first(images):
+    # images.shape == (n_images, y, x, n_channels)
+    images = np.swapaxes(images, 1, 3)
+    images = np.swapaxes(images, 2, 3)
+    # images.shape == (n_images, n_channels, y, x)
+    return images
+
+
+def convolution(images, components, filter_shape, step_shape):
+    # Expect images of shape == (n_images, n_channels, y, x)
+    # (n_filters, n_channels*filter_height*filter_width)
+    #   -> (n_filters, n_channels, filter_height, filter_width)
+    n_filters, n_channels = components.shape[0], images.shape[1]
+    filters = components.reshape(n_filters, n_channels, *filter_shape)
+
+    images = images.astype(np.float32)
+    return convolution_2d(images, filters, stride=step_shape).data
 
 
 def image_to_patch_vectors(image, filter_shape, step_shape):
@@ -74,41 +86,13 @@ def image_to_patch_vectors(image, filter_shape, step_shape):
     X: np.array
         A set of normalized and flattened patches
     """
+
     X = Patches(image, filter_shape, step_shape).patches
+    # X.shape == (n_patches, filter_height, filter_width)
+
     X = X.reshape(X.shape[0], -1)  # flatten each patch
-    X = remove_patch_mean(X)
-    return X
-
-
-@profile
-def convolution(images, filters, filter_shape, step_shape):
-    # filters : [n_filters, filter_height, filter_width]
-    # images  : [n_images, image_height, image_width]
-
-    X = []
-    for image in images:
-        # the shape of patches.patches is
-        # (n_patches, filter_height, filter_width)
-        # and the the shape of filters is
-        # [n_filters, filter_height, filter_width].
-        # Run convolution by calculating products of patches and filters.
-        # The shape of convolution output is
-        # (n_patches, n_filters)
-        # where n_patches = output_height * output_width.
-        patches = Patches(image, filter_shape, step_shape)
-        x = np.tensordot(patches.patches, filters, axes=([1, 2], [1, 2]))
-        X.append(x)
-    X = np.array(X)
-
-    # Here, the shape of X is (n_images, n_patches, n_filters)
-    # Reshape X into (n_filters, n_images, n_patches)
-    X = np.swapaxes(X, 1, 2)
-    X = np.swapaxes(X, 0, 1)
-
-    # Here the shape of X is (n_filters, n_images, n_patches)
-    # At the last, reshape X into
-    # (n_filters, n_images, output_height, output_width)
-    return X.reshape(X.shape[0], X.shape[1], *patches.output_shape)
+    X = X - X.mean(axis=1, keepdims=True)  # Remove mean from each patch.
+    return X  # \overline{X}_i in the original paper
 
 
 def binarize(X):
@@ -147,7 +131,7 @@ def to_tuple_if_int(value):
     return value
 
 
-class BasePCANet(object):
+class PCANet(object):
     def __init__(self, image_shape,
                  filter_shape_l1, step_shape_l1, n_l1_output,
                  filter_shape_l2, step_shape_l2, n_l2_output,
@@ -191,20 +175,6 @@ class BasePCANet(object):
         self.pca_l1 = IncrementalPCA(n_l1_output)
         self.pca_l2 = IncrementalPCA(n_l2_output)
 
-    def convolution_l1(self, images):
-        # (n_filters, filter_height*filter_width)
-        #   -> (n_filters, filter_height, filter_width)
-        filter_ = self.pca_l1.components_.reshape(-1, *self.filter_shape_l1)
-        return convolution(images, filter_,
-                           self.filter_shape_l1,
-                           self.step_shape_l1)
-
-    def convolution_l2(self, images):
-        filter_ = self.pca_l2.components_.reshape(-1, *self.filter_shape_l2)
-        return convolution(images, filter_,
-                           self.filter_shape_l2,
-                           self.step_shape_l2)
-
     def histogram(self, binary_images):
         """
         Separate a given image into blocks and calculate a histogram
@@ -240,20 +210,38 @@ class BasePCANet(object):
             return np.concatenate(h)  # Bhist(T) in the original paper
         return np.array([histogram(image) for image in binary_images])
 
-    @profile
-    def fit(self, images):
-        assert(np.ndim(images) == 3)  # input image must be grayscale
+    def process_input(self, images):
+        assert(np.ndim(images) >= 3)
         assert(images.shape[1:3] == self.image_shape)
+        if np.ndim(images) == 3:
+            # forcibly convert to multi-channel images
+            images = atleast_4d(images)
+        images = to_channels_first(images)
+        return images
+
+    def fit(self, images):
+        images = self.process_input(images)
+        # images.shape == (n_images, n_channels, y, x)
+
         for image in images:
-            patches = image_to_patch_vectors(image,
-                                             self.filter_shape_l1,
-                                             self.step_shape_l1)
+            X = []
+            for channel in image:
+                patches = image_to_patch_vectors(channel,
+                                                 self.filter_shape_l1,
+                                                 self.step_shape_l1)
+                X.append(patches)
+            patches = np.hstack(X)
             self.pca_l1.partial_fit(patches)
 
-        # images.shape == (L1, n_images, y, x)
-        images = self.convolution_l1(images)
-        h, w = images.shape[2:4]
-        images = images.reshape(-1, h, w)
+        images = convolution(
+            images,
+            self.pca_l1.components_,
+            self.filter_shape_l1,
+            self.step_shape_l1
+        )
+        # images.shape == (n_images, L1, y, x)
+
+        images = images.reshape(-1, *images.shape[2:4])
 
         for image in images:
             patches = image_to_patch_vectors(image,
@@ -262,26 +250,31 @@ class BasePCANet(object):
             self.pca_l2.partial_fit(patches)
         return self
 
-    @profile
     def transform(self, images):
-        assert(np.ndim(images) == 3)  # input image must be grayscale
-        assert(images.shape[1:3] == self.image_shape)
+        images = self.process_input(images)
+        # images.shape == (n_images, n_channels, y, x)
 
-        n_images = images.shape[0]
-
-        # images.shape == (n_images, y, x)
-        L1 = self.convolution_l1(images)
+        images = convolution(
+            images,
+            self.pca_l1.components_,
+            self.filter_shape_l1,
+            self.step_shape_l1
+        )
+        images = np.swapaxes(images, 0, 1)
 
         # L1.shape == (L1, n_images, y, x)
         # iterate over each L1 output
+
         X = []
-        for maps in L1:
-            # maps.shape == (n_images, y, x)
-            maps = self.convolution_l2(maps)
-            # feature maps are generated.
-            # maps.shape == (L2, n_images, y, x) right here
-            maps = np.swapaxes(maps, 0, 1)
-            # maps.shape == (n_images, L2, y, x)
+        for maps in images:
+            n_images, h, w = maps.shape
+            maps = convolution(
+                maps.reshape(n_images, 1, h, w),  # regard as 1 channel images
+                self.pca_l2.components_,
+                self.filter_shape_l1,
+                self.step_shape_l2
+            )
+            # maps.shape == (n_images, L2, y, x) right here
             maps = binarize(maps)
             maps = binary_to_decimal(maps)
             # maps.shape == (n_images, y, x)
@@ -316,51 +309,3 @@ class BasePCANet(object):
                                     self.filter_shape_l2,
                                     self.step_shape_l2)
         is_valid_(output_shape_l2, self.block_shape, self.block_shape)
-
-
-
-class PCANet(object):
-    def __init__(self, **kwargs):
-        self.pcanet_params = kwargs
-        self.pcanets = []
-
-    def atleast_4d(self, images):
-        """Regard gray-scale images as 1-channel images"""
-        assert(np.ndim(images) == 3)
-        return images.reshape(*images.shape, 1)
-
-    def fit(self, images):
-        assert(np.ndim(images) >= 3)
-
-        if np.ndim(images) == 3:
-            # forcibly convert to multi-channel images
-            images = self.atleast_4d(images)
-
-        n_channels = images.shape[3]
-
-        self.pcanets = \
-            [BasePCANet(**self.pcanet_params) for i in range(n_channels)]
-
-        for i in range(n_channels):
-            # images.shape == (n_images, y, x, n_channels)
-            self.pcanets[i].fit(images[:, :, :, i])
-
-    def transform(self, images):
-        assert(np.ndim(images) >= 3)
-
-        if np.ndim(images) == 3:
-            images = self.atleast_4d(images)
-
-        n_channels = images.shape[3]
-
-        X = []
-        for i in range(n_channels):
-            x = self.pcanets[i].transform(images[:, :, :, i])
-            X.append(x)
-        X = np.hstack(X)
-        return X.astype(np.float64)
-
-    def validate_structure(self):
-        for pcanet in self.pcanets:
-            pcanet.validate_structure()
-
