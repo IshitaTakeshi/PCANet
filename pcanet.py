@@ -37,8 +37,11 @@ class Patches(object):
         (n_patches, filter_height, filter_width)
         """
         fh, fw = self.filter_shape
-        it = itertools.product(self.ys, self.xs)
-        return np.array([self.image[y:y+fh, x:x+fw] for y, x in it])
+        it = list(itertools.product(self.ys, self.xs))
+        patches = np.ndarray((len(it), fh, fw), dtype=self.image.dtype)
+        for i, (y, x) in enumerate(it):
+            patches[i, :, :] = self.image[y:y+fh, x:x+fw]
+        return patches
 
     @property
     def output_shape(self):
