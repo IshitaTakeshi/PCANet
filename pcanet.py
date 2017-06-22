@@ -7,6 +7,8 @@ from chainer.functions import convolution_2d
 import numpy as np
 from sklearn.decomposition import PCA, IncrementalPCA
 
+from histogram import histogram
+
 
 def steps(image_shape, filter_shape, step_shape):
     h, w = image_shape
@@ -205,13 +207,11 @@ class PCANet(object):
             self.n_bins = k + 1
         bins = np.linspace(-0.5, k - 0.5, self.n_bins)
 
-        def histogram(image):
-            # Convert patches extracted from one image
-            # into a feature vector.
-            patches = Patches(image, self.block_shape, self.block_shape)
-            h = [np.histogram(p, bins)[0] for p in patches.patches]
-            return np.concatenate(h)  # Bhist(T) in the original paper
-        return np.array([histogram(image) for image in binary_images])
+        def bhist(image):
+            # calculate Bhist(T) in the original paper
+            ps = Patches(image, self.block_shape, self.block_shape).patches
+            return np.concatenate([histogram(p.flatten(), bins) for p in ps])
+        return np.array([bhist(image) for image in binary_images])
 
     def process_input(self, images):
         assert(np.ndim(images) >= 3)
