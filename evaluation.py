@@ -161,7 +161,9 @@ def parse_args():
             required=True)
     parser.add_argument("--n-l2-output", dest="n_l2_output", type=int,
             required=True)
-    parser.add_argument("--block-shape", dest="block_shape", type=int,
+    parser.add_argument("--filter-shape-pooling", dest="filter_shape_pooling", type=int,
+            required=True)
+    parser.add_argument("--step-shape-pooling", dest="step_shape_pooling", type=int,
             required=True)
     parser.add_argument("--n-estimators", dest="n_estimators", type=int,
             required=True)
@@ -260,9 +262,9 @@ def run_cifar(n_train=None, n_test=None):
     datasize = {"n_train": n_train, "n_test": n_test}
     transformer_params = {
         "image_shape": 32,
-        "filter_shape_l1": 4, "step_shape_l1": 2, "n_l1_output": 3,
-        "filter_shape_l2": 2, "step_shape_l2": 1, "n_l2_output": 3,
-        "block_shape": 7
+        "filter_shape_l1": 5, "step_shape_l1": 2, "n_l1_output": 3,
+        "filter_shape_l2": 5, "step_shape_l2": 1, "n_l2_output": 3,
+        "filter_shape_pooling": 8, "step_shape_pooling": 4
     }
     dataset = load_cifar()
     run(dataset, datasize, transformer_params)
@@ -272,9 +274,9 @@ def run_mnist(n_train=None, n_test=None):
     datasize = {"n_train": n_train, "n_test": n_test}
     transformer_params = {
         "image_shape": 28,
-        "filter_shape_l1": 4, "step_shape_l1": 2, "n_l1_output": 3,
-        "filter_shape_l2": 4, "step_shape_l2": 1, "n_l2_output": 3,
-        "block_shape": 5
+        "filter_shape_l1": 5, "step_shape_l1": 1, "n_l1_output": 16,
+        "filter_shape_l2": 5, "step_shape_l2": 1, "n_l2_output": 8,
+        "filter_shape_pooling": 8, "step_shape_pooling": 4
     }
     dataset = load_mnist()
     run(dataset, datasize, transformer_params)

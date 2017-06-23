@@ -151,8 +151,27 @@ class TestPCANet(unittest.TestCase):
             [1, 1, 1, 1, 1, 2, 1, 0, 0, 1, 2, 1, 0, 1, 1, 2]
         ])
         pcanet = PCANet(None, None, None, None, None, None,
-                        n_l2_output=2, block_shape=(2, 2))
-        # assume that n_l1_output = 2
+                        n_l2_output=2,
+                        filter_shape_pooling=2,
+                        step_shape_pooling=2)
+        assert_array_equal(pcanet.histogram(images), expected)
+
+        images = np.array([
+            [[1, 0, 1],
+             [2, 0, 0],
+             [1, 3, 3]],
+            [[2, 0, 0],
+             [1, 1, 1],
+             [3, 0, 1]]
+        ])
+        expected = np.array([
+            [2, 1, 1, 0, 3, 1, 0, 0, 1, 1, 1, 1, 2, 0, 0, 2],
+            [1, 2, 1, 0, 2, 2, 0, 0, 1, 2, 0, 1, 1, 3, 0, 0]
+        ])
+        pcanet = PCANet(None, None, None, None, None, None,
+                        n_l2_output=2,
+                        filter_shape_pooling=2,
+                        step_shape_pooling=1)
         assert_array_equal(pcanet.histogram(images), expected)
 
     def test_to_tuple_if_int(self):
@@ -184,7 +203,7 @@ class TestPCANet(unittest.TestCase):
             image_shape=9,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=1, n_l2_output=1,
-            block_shape=1
+            filter_shape_pooling=1, step_shape_pooling=1
         )
         pcanet.validate_structure()
 
@@ -192,7 +211,7 @@ class TestPCANet(unittest.TestCase):
             image_shape=10,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=1, n_l2_output=1,
-            block_shape=1
+            filter_shape_pooling=1, step_shape_pooling=1
         )
         self.assertRaises(ValueError, pcanet.validate_structure)
 
@@ -202,7 +221,7 @@ class TestPCANet(unittest.TestCase):
             image_shape=13,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=1, n_l2_output=1,
-            block_shape=1
+            filter_shape_pooling=1, step_shape_pooling=1
         )
         pcanet.validate_structure()
 
@@ -210,7 +229,7 @@ class TestPCANet(unittest.TestCase):
             image_shape=13,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
-            block_shape=1
+            filter_shape_pooling=1, step_shape_pooling=1
         )
         self.assertRaises(ValueError, pcanet.validate_structure)
 
@@ -221,7 +240,7 @@ class TestPCANet(unittest.TestCase):
             image_shape=19,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
-            block_shape=2
+            filter_shape_pooling=2, step_shape_pooling=2
         )
         pcanet.validate_structure()
 
@@ -229,7 +248,7 @@ class TestPCANet(unittest.TestCase):
             image_shape=19,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
-            block_shape=3
+            filter_shape_pooling=3, step_shape_pooling=1
         )
         self.assertRaises(ValueError, pcanet.validate_structure)
 

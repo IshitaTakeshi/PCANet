@@ -140,7 +140,7 @@ class PCANet(object):
     def __init__(self, image_shape,
                  filter_shape_l1, step_shape_l1, n_l1_output,
                  filter_shape_l2, step_shape_l2, n_l2_output,
-                 block_shape):
+                 filter_shape_pooling, step_shape_pooling):
         """
         Parameters
         ----------
@@ -160,8 +160,10 @@ class PCANet(object):
         n_l2_output:
             L2 in the original paper. The number of outputs obtained
             from each L1 output.
-        block_shape: int or sequence of ints
-            The shape of each block in the pooling layer.
+        filter_shape_pooling: int or sequence of ints
+            The shape of the filter in the pooling layer.
+        step_shape_pooling: int or sequence of ints
+            The shape of the filter step in the pooling layer.
         """
 
         self.image_shape = to_tuple_if_int(image_shape)
@@ -174,7 +176,8 @@ class PCANet(object):
         self.step_shape_l2 = to_tuple_if_int(step_shape_l2)
         self.n_l2_output = n_l2_output
 
-        self.block_shape = to_tuple_if_int(block_shape)
+        self.filter_shape_pooling = to_tuple_if_int(filter_shape_pooling)
+        self.step_shape_pooling = to_tuple_if_int(step_shape_pooling)
         self.n_bins = None  # TODO make n_bins specifiable
 
         self.pca_l1 = IncrementalPCA(n_l1_output)
@@ -209,7 +212,10 @@ class PCANet(object):
 
         def bhist(image):
             # calculate Bhist(T) in the original paper
-            ps = Patches(image, self.block_shape, self.block_shape).patches
+            ps = Patches(
+                image,
+                self.filter_shape_pooling,
+                self.step_shape_pooling).patches
             return np.concatenate([histogram(p.flatten(), bins) for p in ps])
         return np.array([bhist(image) for image in binary_images])
 
@@ -234,6 +240,7 @@ class PCANet(object):
                                                  self.step_shape_l1)
                 X.append(patches)
             patches = np.hstack(X)
+            # patches.shape = (n_patches, n_patches * vector length)
             self.pca_l1.partial_fit(patches)
 
         images = convolution(
@@ -311,4 +318,4 @@ class PCANet(object):
         output_shape_l2 = is_valid_(output_shape_l1,
                                     self.filter_shape_l2,
                                     self.step_shape_l2)
-        is_valid_(output_shape_l2, self.block_shape, self.block_shape)
+        is_valid_(output_shape_l2, self.filter_shape_pooling, self.filter_shape_pooling)
