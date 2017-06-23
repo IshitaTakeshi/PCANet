@@ -255,15 +255,15 @@ def run(dataset, datasize, transformer_params, filename="result.json"):
     result = concatenate_dicts(hyperparameters, result)
     result["type"] = "normal"
     export_json(result, filename)
-    print(result)
+    print(json.dumps(result, sort_keys=True))
 
 
 def run_cifar(n_train=None, n_test=None):
     datasize = {"n_train": n_train, "n_test": n_test}
     transformer_params = {
         "image_shape": 32,
-        "filter_shape_l1": 5, "step_shape_l1": 2, "n_l1_output": 3,
-        "filter_shape_l2": 5, "step_shape_l2": 1, "n_l2_output": 3,
+        "filter_shape_l1": 5, "step_shape_l1": 1, "n_l1_output": 16,
+        "filter_shape_l2": 5, "step_shape_l2": 1, "n_l2_output": 8,
         "filter_shape_pooling": 8, "step_shape_pooling": 4
     }
     dataset = load_cifar()
@@ -276,7 +276,7 @@ def run_mnist(n_train=None, n_test=None):
         "image_shape": 28,
         "filter_shape_l1": 5, "step_shape_l1": 1, "n_l1_output": 16,
         "filter_shape_l2": 5, "step_shape_l2": 1, "n_l2_output": 8,
-        "filter_shape_pooling": 8, "step_shape_pooling": 4
+        "filter_shape_pooling": 5, "step_shape_pooling": 5
     }
     dataset = load_mnist()
     run(dataset, datasize, transformer_params)
@@ -284,4 +284,4 @@ def run_mnist(n_train=None, n_test=None):
 
 if __name__ == "__main__":
     run_mnist(n_train=200, n_test=200)
-    # run_cifar(n_train=200, n_test=200)
+    # run_cifar(n_train=None, n_test=None)
