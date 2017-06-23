@@ -14,7 +14,7 @@ import tarfile
 import numpy as np
 from mnist import MNIST
 from sklearn.datasets import fetch_mldata
-from sklearn.svm import LinearSVC
+from sklearn.svm import LinearSVC, SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -99,7 +99,7 @@ def params_to_str(params):
 
 
 def run_classifier(X_train, X_test, y_train, y_test):
-    model = LinearSVC(C=10)
+    model = SVC(C=10)
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
     return y_test, y_pred
@@ -113,15 +113,18 @@ def run_pcanet_normal(transformer_params,
     t1 = timeit.default_timer()
     model.fit(images_train)
     t2 = timeit.default_timer()
-    training_time = t2 - t1
+    train_time = t2 - t1
 
+    t1 = timeit.default_timer()
     X_train = model.transform(images_train)
+    t2 = timeit.default_timer()
+    transform_time = t2 - t1
     X_test = model.transform(images_test)
 
     y_test, y_pred = run_classifier(X_train, X_test, y_train, y_test)
     accuracy = accuracy_score(y_test, y_pred)
 
-    return model, accuracy, training_time
+    return model, accuracy, train_time, transform_time
 
 
 def run_pcanet_ensemble(ensemble_params, transformer_params,
@@ -135,13 +138,13 @@ def run_pcanet_ensemble(ensemble_params, transformer_params,
     t1 = timeit.default_timer()
     model.fit(images_train, y_train)
     t2 = timeit.default_timer()
-    training_time = t2 - t1
+    train_time = t2 - t1
 
     y_pred = model.predict(images_test)
 
     accuracy = accuracy_score(y_test, y_pred)
 
-    return model, accuracy, training_time
+    return model, accuracy, train_time
 
 
 def parse_args():
@@ -196,7 +199,7 @@ def evaluate_ensemble(train_set, test_set,
                       ensemble_params, transformer_params):
     (images_train, y_train), (images_test, y_test) = train_set, test_set
 
-    model, accuracy, training_time = run_pcanet_ensemble(
+    model, accuracy, train_time = run_pcanet_ensemble(
         ensemble_params, transformer_params,
         images_train, images_test, y_train, y_test
     )
@@ -207,14 +210,14 @@ def evaluate_ensemble(train_set, test_set,
     params = {}
     params["ensemble-model"] = filename
     params["ensemble-accuracy"] = accuracy
-    params["ensemble-training-time"] = training_time
+    params["ensemble-train-time"] = train_time
     return params
 
 
 def evaluate_normal(train_set, test_set, transformer_params):
     (images_train, y_train), (images_test, y_test) = train_set, test_set
 
-    model, accuracy, training_time = run_pcanet_normal(
+    model, accuracy, train_time, transform_time = run_pcanet_normal(
         transformer_params,
         images_train, images_test, y_train, y_test
     )
@@ -225,7 +228,8 @@ def evaluate_normal(train_set, test_set, transformer_params):
     params = {}
     params["normal-model"] = filename
     params["normal-accuracy"] = accuracy
-    params["normal-training-time"] = training_time
+    params["normal-train-time"] = train_time
+    params["normal-transform-time"] = transform_time
     return params
 
 
