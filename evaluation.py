@@ -32,7 +32,7 @@ def params_to_str(params):
 
 
 def run_classifier(X_train, X_test, y_train, y_test):
-    model = SVC(C=10)
+    model = SVC(C=1e8)
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
     return y_test, y_pred
@@ -73,11 +73,14 @@ def run_pcanet_ensemble(ensemble_params, transformer_params,
     t2 = timeit.default_timer()
     train_time = t2 - t1
 
+    t1 = timeit.default_timer()
     y_pred = model.predict(images_test)
+    t2 = timeit.default_timer()
+    predict_time = t2 - t1
 
     accuracy = accuracy_score(y_test, y_pred)
 
-    return model, accuracy, train_time
+    return model, accuracy, train_time, predict_time
 
 
 def parse_args():
@@ -132,7 +135,7 @@ def evaluate_ensemble(train_set, test_set,
                       ensemble_params, transformer_params):
     (images_train, y_train), (images_test, y_test) = train_set, test_set
 
-    model, accuracy, train_time = run_pcanet_ensemble(
+    model, accuracy, train_time, predict_time = run_pcanet_ensemble(
         ensemble_params, transformer_params,
         images_train, images_test, y_train, y_test
     )
@@ -144,6 +147,7 @@ def evaluate_ensemble(train_set, test_set,
     params["ensemble-model"] = filename
     params["ensemble-accuracy"] = accuracy
     params["ensemble-train-time"] = train_time
+    params["ensemble-predict-time"] = predict_time
     return params
 
 
@@ -178,7 +182,8 @@ def export_json(result, filename):
         json.dump(result, f, sort_keys=True, indent=2)
 
 
-def run(dataset, datasize, transformer_params, filename="result.json"):
+def run(dataset, datasize, transformer_params, ensemble_params,
+        model_type, filename="result.json"):
     train_set, test_set = dataset
 
     train_set, test_set = pick(train_set, test_set,
@@ -187,12 +192,27 @@ def run(dataset, datasize, transformer_params, filename="result.json"):
     # Set the actual data size
     datasize["n_train"], datasize["n_test"] = len(train_set[1]), len(test_set[1])
 
-    hyperparameters = concatenate_dicts(datasize, transformer_params)
-    result = evaluate_normal(train_set, test_set, transformer_params)
-    result = concatenate_dicts(hyperparameters, result)
-    result["type"] = "normal"
-    export_json(result, filename)
-    print(json.dumps(result, sort_keys=True))
+    if model_type == "normal":
+        result = evaluate_normal(train_set, test_set, transformer_params)
+    elif model_type == "ensemble":
+        result = evaluate_ensemble(train_set, test_set,
+                                   ensemble_params, transformer_params)
+    else:
+        raise ValueError("Invalid model type '{}'".format(model_type))
+
+    params = concatenate_dicts(
+        datasize,
+        transformer_params,
+        ensemble_params,
+        result
+    )
+
+    params["model-type"] = model_type
+
+    export_json(params, filename)
+    print(json.dumps(params, sort_keys=True))
+
+
 def reshape_dataset(train, test):
     def channels_last(X):
         X = np.swapaxes(X, 1, 2)
@@ -223,11 +243,16 @@ def run_cifar(n_train=None, n_test=None, model_type="normal"):
         "filter_shape_l2": 5, "step_shape_l2": 1, "n_l2_output": 8,
         "filter_shape_pooling": 8, "step_shape_pooling": 4
     }
+    ensemble_params = {
+        "n_estimators" : 200,
+        "sampling_ratio" : 0.01,
+        "n_jobs" : -1
+    }
     dataset = load_cifar()
-    run(dataset, datasize, transformer_params)
+    run(dataset, datasize, transformer_params, ensemble_params, model_type)
 
 
-def run_mnist(n_train=None, n_test=None):
+def run_mnist(n_train=None, n_test=None, model_type="normal"):
     datasize = {"n_train": n_train, "n_test": n_test}
     transformer_params = {
         "image_shape": 28,
@@ -235,10 +260,17 @@ def run_mnist(n_train=None, n_test=None):
         "filter_shape_l2": 5, "step_shape_l2": 1, "n_l2_output": 8,
         "filter_shape_pooling": 5, "step_shape_pooling": 5
     }
+    ensemble_params = {
+        "n_estimators" : 100,
+        "sampling_ratio" : 0.07,
+        "n_jobs" : -1
+    }
     dataset = load_mnist()
-    run(dataset, datasize, transformer_params)
+    run(dataset, datasize, transformer_params, ensemble_params, model_type)
 
 
 if __name__ == "__main__":
-    run_mnist(n_train=200, n_test=200)
-    # run_cifar(n_train=None, n_test=None)
+    print("MNIST")
+    run_mnist(n_train=None, n_test=None, model_type="ensemble")
+    # print("CIFAR")
+    # run_cifar(n_train=None, n_test=None, model_type="ensemble")
