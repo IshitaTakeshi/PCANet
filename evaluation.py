@@ -32,7 +32,7 @@ def params_to_str(params):
 
 
 def run_classifier(X_train, X_test, y_train, y_test):
-    model = SVC(C=1e8)
+    model = SVC(C=10)
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
     return y_test, y_pred
