@@ -1,4 +1,4 @@
-from multiprocessing import Pool
+from multiprocessing import cpu_count
 from itertools import repeat
 
 from sklearn.svm import LinearSVC
@@ -34,7 +34,7 @@ def fit_random(transformer, estimator, images, y, sampling_ratio):
 
 
 class Bagging(object):
-    def __init__(self, n_estimators, sampling_ratio, n_jobs,
+    def __init__(self, n_estimators, sampling_ratio, n_jobs=-1,
                  **transformer_params):
         """
         n_estimators: int
@@ -57,7 +57,10 @@ class Bagging(object):
             [LinearSVC(C=10) for i in range(n_estimators)]
 
         self.sampling_ratio = sampling_ratio
+
         self.n_jobs = n_jobs
+        if n_jobs == -1:
+            self.n_jobs = cpu_count()
 
     def fit(self, images, y):
         # run fit_random in parallel
