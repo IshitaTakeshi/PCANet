@@ -7,90 +7,23 @@ from argparse import ArgumentParser
 import hashlib
 import time
 import timeit
-from multiprocessing import cpu_count
 from urllib.request import urlopen
 import tarfile
 
 import numpy as np
-from mnist import MNIST
 from sklearn.datasets import fetch_mldata
 from sklearn.svm import LinearSVC, SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn.utils import shuffle
+from chainer.datasets import get_mnist, get_cifar10
 
 from pcanet import PCANet
 from ensemble import Bagging
 
 
 pickle_dir = "pickles"
-data_dir = "data"
-
-
-def load_cifar():
-    cifar_dir = join(data_dir, "cifar")
-    if not exists(cifar_dir):
-        os.makedirs(cifar_dir)
-
-    def download(path):
-        print("Downloading")
-        url = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
-        response = urlopen(url)
-        content = response.read()
-        with open(path, "wb") as f:
-            f.write(content)
-        print("Finished")
-
-    def extract(path):
-        with tarfile.open(path) as f:
-            f.extractall(path=cifar_dir)
-
-    def load_batch(filename):
-        p = join(cifar_dir, "cifar-10-batches-py", filename)
-        with open(p, "rb") as f:
-            d = pickle.load(f, encoding="bytes")
-        return d
-
-    def load_train():
-        X = []
-        y = []
-        for i in range(1, 6):
-            d = load_batch("data_batch_" + str(i))
-            X_, y_ = d[b"data"], d[b"labels"]
-            X.append(X_)
-            y += y_
-        X = np.vstack(X)
-        X = X.reshape(-1, 32, 32, 3)
-        return X, y
-
-    def load_test():
-        d = load_batch("test_batch")
-        X, y = d[b"data"], d[b"labels"]
-        X = X.reshape(-1, 32, 32, 3)
-        return X, y
-
-    path = join(cifar_dir, "cifar-10-python.tar.gz")
-    if not exists(path):
-        download(path)
-    extract(path)
-    train_set = load_train()
-    test_set = load_test()
-    return train_set, test_set
-
-
-def load_mnist():
-    mnist = MNIST("mnist")
-    X_train, y_train = mnist.load_training()
-    X_test, y_test = mnist.load_testing()
-
-    X_train, y_train = np.array(X_train), np.array(y_train)
-    X_train = X_train.reshape(-1, 28, 28)
-    X_test, y_test = np.array(X_test), np.array(y_test)
-    X_test = X_test.reshape(-1, 28, 28)
-    train_set = X_train, y_train
-    test_set = X_test, y_test
-    return train_set, test_set
 
 
 def params_to_str(params):
@@ -260,9 +193,29 @@ def run(dataset, datasize, transformer_params, filename="result.json"):
     result["type"] = "normal"
     export_json(result, filename)
     print(json.dumps(result, sort_keys=True))
+def reshape_dataset(train, test):
+    def channels_last(X):
+        X = np.swapaxes(X, 1, 2)
+        X = np.swapaxes(X, 2, 3)
+        return X
+
+    X_train, y_train = train._datasets[0], train._datasets[1]
+    X_test, y_test = test._datasets[0], test._datasets[1]
+    X_train, X_test = channels_last(X_train), channels_last(X_test)
+    return ((X_train, y_train), (X_test, y_test))
 
 
-def run_cifar(n_train=None, n_test=None):
+def load_cifar():
+    train, test = get_cifar10(ndim=3)
+    return reshape_dataset(train, test)
+
+
+def load_mnist():
+    train, test = get_mnist(ndim=3)
+    return reshape_dataset(train, test)
+
+
+def run_cifar(n_train=None, n_test=None, model_type="normal"):
     datasize = {"n_train": n_train, "n_test": n_test}
     transformer_params = {
         "image_shape": 32,

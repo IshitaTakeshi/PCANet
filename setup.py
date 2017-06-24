@@ -12,7 +12,6 @@ setup(
         'chainer',
         'numpy',
         'psutil',
-        'python-mnist',
         'recommonmark',
         'scikit-learn',
         'scipy',
