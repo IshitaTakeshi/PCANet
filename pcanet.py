@@ -53,7 +53,8 @@ class Patches(object):
 def atleast_4d(images):
     """Regard gray-scale images as 1-channel images"""
     assert(np.ndim(images) == 3)
-    return images.reshape(*images.shape, 1)
+    n, h, w = images.shape
+    return images.reshape(n, h, w, 1)
 
 
 def to_channels_first(images):
