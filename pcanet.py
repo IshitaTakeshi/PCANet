@@ -3,7 +3,10 @@
 
 import itertools
 
+from chainer.cuda import to_gpu, to_cpu
 from chainer.functions import convolution_2d
+from chainer import functions as F
+
 import numpy as np
 from sklearn.decomposition import PCA, IncrementalPCA
 
@@ -18,6 +21,11 @@ def steps(image_shape, filter_shape, step_shape):
     ys = range(0, h-fh+1, sh)
     xs = range(0, w-fw+1, sw)
     return ys, xs
+
+
+def components_to_filters(components, n_channels, filter_shape):
+    n_filters = components.shape[0]
+    return components.reshape(n_filters, n_channels, *filter_shape)
 
 
 def output_shape(ys, xs):
@@ -63,17 +71,6 @@ def to_channels_first(images):
     images = np.swapaxes(images, 2, 3)
     # images.shape == (n_images, n_channels, y, x)
     return images
-
-
-def convolution(images, components, filter_shape, step_shape):
-    # Expect images of shape == (n_images, n_channels, y, x)
-    # (n_filters, n_channels*filter_height*filter_width)
-    #   -> (n_filters, n_channels, filter_height, filter_width)
-    n_filters, n_channels = components.shape[0], images.shape[1]
-    filters = components.reshape(n_filters, n_channels, *filter_shape)
-
-    images = images.astype(np.float32)
-    return convolution_2d(images, filters, stride=step_shape).data
 
 
 def image_to_patch_vectors(image, filter_shape, step_shape):
@@ -236,28 +233,37 @@ class PCANet(object):
         for image in images:
             X = []
             for channel in image:
-                patches = image_to_patch_vectors(channel,
-                                                 self.filter_shape_l1,
-                                                 self.step_shape_l1)
+                patches = image_to_patch_vectors(
+                    channel,
+                    self.filter_shape_l1,
+                    self.step_shape_l1
+                )
                 X.append(patches)
             patches = np.hstack(X)
             # patches.shape = (n_patches, n_patches * vector length)
             self.pca_l1.partial_fit(patches)
 
-        images = convolution(
-            images,
+        filters_l1 = components_to_filters(
             self.pca_l1.components_,
-            self.filter_shape_l1,
-            self.step_shape_l1
+            n_channels=images.shape[1],
+            filter_shape=self.filter_shape_l1,
         )
-        # images.shape == (n_images, L1, y, x)
 
+        images = convolution_2d(
+            images,
+            filters_l1,
+            stride=self.step_shape_l1
+        ).data
+
+        # images.shape == (n_images, L1, y, x)
         images = images.reshape(-1, *images.shape[2:4])
 
         for image in images:
-            patches = image_to_patch_vectors(image,
-                                             self.filter_shape_l2,
-                                             self.step_shape_l2)
+            patches = image_to_patch_vectors(
+                image,
+                self.filter_shape_l2,
+                self.step_shape_l2
+            )
             self.pca_l2.partial_fit(patches)
         return self
 
@@ -265,13 +271,29 @@ class PCANet(object):
         images = self.process_input(images)
         # images.shape == (n_images, n_channels, y, x)
 
-        images = convolution(
-            images,
+        filters_l1 = components_to_filters(
             self.pca_l1.components_,
-            self.filter_shape_l1,
-            self.step_shape_l1
+            n_channels=images.shape[1],
+            filter_shape=self.filter_shape_l1,
         )
-        images = np.swapaxes(images, 0, 1)
+
+        filters_l2 = components_to_filters(
+            self.pca_l2.components_,
+            n_channels=1,
+            filter_shape=self.filter_shape_l2
+        )
+
+        images = to_gpu(images)
+        filters_l1 = to_gpu(filters_l1)
+        filters_l2 = to_gpu(filters_l2)
+
+        images = convolution_2d(
+            images,
+            filters_l1,
+            stride=self.step_shape_l1
+        )
+
+        images = F.swapaxes(images, 0, 1)
 
         # L1.shape == (L1, n_images, y, x)
         # iterate over each L1 output
@@ -279,17 +301,19 @@ class PCANet(object):
         X = []
         for maps in images:
             n_images, h, w = maps.shape
-            maps = convolution(
+            maps = convolution_2d(
                 maps.reshape(n_images, 1, h, w),  # regard as 1 channel images
-                self.pca_l2.components_,
-                self.filter_shape_l1,
-                self.step_shape_l2
-            )
+                filters_l2,
+                stride=self.step_shape_l2
+            ).data
+
+            maps = to_cpu(maps)
             # maps.shape == (n_images, L2, y, x) right here
             maps = binarize(maps)
             maps = binary_to_decimal(maps)
             # maps.shape == (n_images, y, x)
             x = self.histogram(maps)
+
             # x is a set of feature vectors.
             # The shape of x is (n_images, vector length)
             X.append(x)

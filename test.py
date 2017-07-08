@@ -3,7 +3,7 @@ import numpy as np
 from numpy.testing import assert_array_equal
 
 from pcanet import Patches, PCANet, image_to_patch_vectors
-from pcanet import binarize, binary_to_decimal, convolution, to_tuple_if_int
+from pcanet import binarize, binary_to_decimal, to_tuple_if_int
 from ensemble import most_frequent_label
 from histogram import histogram
 
@@ -53,46 +53,6 @@ class TestPatches(unittest.TestCase):
 
 
 class TestPCANet(unittest.TestCase):
-    def test_convolution(self):
-        images = np.array([
-            [[[0, 2],
-              [1, 1]],
-             [[3, 1],
-              [2, 1]]],
-            [[[0, 0],
-              [1, 1]],
-             [[4, 1],
-              [2, 2]]]
-        ], dtype=np.float64)
-
-        filters = np.array([
-            [[1, 1, 1, 1, 1, 1, 0, 2]]
-        ], dtype=np.float64)
-
-        T = convolution(images, filters, (2, 2), (1, 1))
-        expected = np.array([
-            [[[10]]],
-            [[[11]]]
-        ])
-        assert_array_equal(T, expected)
-
-        images = np.array([
-            [[[1, 3, 2],
-              [4, 1, 5],
-              [3, 2, 6]]]
-        ], dtype=np.float64)
-
-        filters = np.array([
-            [[1, 2, 3, 1]]
-        ], dtype=np.float64)
-
-        T = convolution(images, filters, (2, 2), (1, 1))
-        expected = np.array([[
-            [[20, 15],
-             [17, 23]]
-        ]])
-        assert_array_equal(T, expected)
-
     def test_binarize(self):
         image = np.array([
             [3, -8],

@@ -68,6 +68,9 @@ def run_pcanet_ensemble(ensemble_params, transformer_params,
         ensemble_params["n_jobs"],
         **transformer_params)
 
+    print("Train images: {}".format(images_train.shape))
+    print("Test images : {}".format(images_test.shape))
+
     t1 = timeit.default_timer()
     model.fit(images_train, y_train)
     t2 = timeit.default_timer()
@@ -134,6 +137,9 @@ def pick(train_set, test_set, n_train, n_test):
 def evaluate_ensemble(train_set, test_set,
                       ensemble_params, transformer_params):
     (images_train, y_train), (images_test, y_test) = train_set, test_set
+
+    print("Train set: {}".format(train_set[0].shape))
+    print("Test set : {}".format(test_set[0].shape))
 
     model, accuracy, train_time, predict_time = run_pcanet_ensemble(
         ensemble_params, transformer_params,
@@ -244,8 +250,8 @@ def run_cifar(n_train=None, n_test=None, model_type="normal"):
         "filter_shape_pooling": 8, "step_shape_pooling": 4
     }
     ensemble_params = {
-        "n_estimators" : 200,
-        "sampling_ratio" : 0.01,
+        "n_estimators" : 20,
+        "sampling_ratio" : 0.1,
         "n_jobs" : -1
     }
     dataset = load_cifar()
@@ -256,13 +262,13 @@ def run_mnist(n_train=None, n_test=None, model_type="normal"):
     datasize = {"n_train": n_train, "n_test": n_test}
     transformer_params = {
         "image_shape": 28,
-        "filter_shape_l1": 5, "step_shape_l1": 1, "n_l1_output": 16,
-        "filter_shape_l2": 5, "step_shape_l2": 1, "n_l2_output": 8,
+        "filter_shape_l1": 5, "step_shape_l1": 1, "n_l1_output": 8,
+        "filter_shape_l2": 5, "step_shape_l2": 1, "n_l2_output": 4,
         "filter_shape_pooling": 5, "step_shape_pooling": 5
     }
     ensemble_params = {
-        "n_estimators" : 100,
-        "sampling_ratio" : 0.07,
+        "n_estimators" : 40,
+        "sampling_ratio" : 0.03,
         "n_jobs" : -1
     }
     dataset = load_mnist()
@@ -270,7 +276,7 @@ def run_mnist(n_train=None, n_test=None, model_type="normal"):
 
 
 if __name__ == "__main__":
-    print("MNIST")
-    run_mnist(n_train=None, n_test=None, model_type="ensemble")
-    # print("CIFAR")
-    # run_cifar(n_train=None, n_test=None, model_type="ensemble")
+    # print("MNIST")
+    # run_mnist(n_train=200, n_test=200, model_type="ensemble")
+    print("CIFAR")
+    run_cifar(n_train=32, n_test=32, model_type="ensemble")
