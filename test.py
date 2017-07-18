@@ -1,6 +1,8 @@
 import unittest
 import numpy as np
-from numpy.testing import assert_array_equal
+# from numpy.testing import assert_array_equal
+import cupy
+from cupy.testing import assert_array_equal
 
 from pcanet import Patches, PCANet, image_to_patch_vectors
 from pcanet import binarize, binary_to_decimal, to_tuple_if_int
@@ -67,7 +69,7 @@ class TestPCANet(unittest.TestCase):
         assert_array_equal(binarize(image), expected)
 
     def test_binary_to_decimal(self):
-        image = np.array([
+        image = cupy.array([
             [[[1, 0],
               [1, 0]],
              [[1, 1],
@@ -77,7 +79,7 @@ class TestPCANet(unittest.TestCase):
              [[1, 0],
               [1, 0]]]
         ])
-        expected = np.array([
+        expected = cupy.array([
             [[3, 1],
              [2, 1]],
             [[3, 2],
@@ -87,16 +89,16 @@ class TestPCANet(unittest.TestCase):
 
     def test_histogram(self):
         k = pow(2, 3)
-        x = np.array([0, 1, 5, 6, 7, 1, 3, 7, 1])
-        expected = np.array([1, 3, 0, 1, 0, 1, 1, 2])
-        assert_array_equal(histogram(x, np.linspace(-0.5, k-0.5, k+1)), expected)
+        x = cupy.array([0, 1, 5, 6, 7, 1, 3, 7, 1])
+        expected = cupy.array([1, 3, 0, 1, 0, 1, 1, 2])
+        assert_array_equal(histogram(x, cupy.linspace(-0.5, k-0.5, k+1)), expected)
 
         k = pow(2, 2)
-        x = np.array([0, 1, 2, 3, 1, 1, 2, 3, 1])
-        expected = np.array([1, 4, 2, 2])
-        assert_array_equal(histogram(x, np.linspace(-0.5, k-0.5, k+1)), expected)
+        x = cupy.array([0, 1, 2, 3, 1, 1, 2, 3, 1])
+        expected = cupy.array([1, 4, 2, 2])
+        assert_array_equal(histogram(x, cupy.linspace(-0.5, k-0.5, k+1)), expected)
 
-        images = np.array([
+        images = cupy.array([
             [[0, 1, 1, 3],
              [3, 1, 2, 2],
              [2, 0, 1, 2],
@@ -106,7 +108,7 @@ class TestPCANet(unittest.TestCase):
              [2, 2, 2, 3],
              [1, 3, 3, 1]]
         ])
-        expected = np.array([
+        expected = cupy.array([
             [1, 2, 0, 1, 0, 1, 2, 1, 2, 1, 1, 0, 0, 3, 1, 0],
             [1, 1, 1, 1, 1, 2, 1, 0, 0, 1, 2, 1, 0, 1, 1, 2]
         ])
@@ -116,7 +118,7 @@ class TestPCANet(unittest.TestCase):
                         step_shape_pooling=2)
         assert_array_equal(pcanet.histogram(images), expected)
 
-        images = np.array([
+        images = cupy.array([
             [[1, 0, 1],
              [2, 0, 0],
              [1, 3, 3]],
@@ -124,7 +126,7 @@ class TestPCANet(unittest.TestCase):
              [1, 1, 1],
              [3, 0, 1]]
         ])
-        expected = np.array([
+        expected = cupy.array([
             [2, 1, 1, 0, 3, 1, 0, 0, 1, 1, 1, 1, 2, 0, 0, 2],
             [1, 2, 1, 0, 2, 2, 0, 0, 1, 2, 0, 1, 1, 3, 0, 0]
         ])
