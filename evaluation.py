@@ -38,6 +38,7 @@ def run_classifier(X_train, X_test, y_train, y_test):
     return y_test, y_pred
 
 
+@profile
 def run_pcanet_normal(transformer_params,
                       images_train, images_test, y_train, y_test):
     model = PCANet(**transformer_params)
@@ -67,9 +68,6 @@ def run_pcanet_ensemble(ensemble_params, transformer_params,
         ensemble_params["sampling_ratio"],
         ensemble_params["n_jobs"],
         **transformer_params)
-
-    print("Train images: {}".format(images_train.shape))
-    print("Test images : {}".format(images_test.shape))
 
     t1 = timeit.default_timer()
     model.fit(images_train, y_train)
@@ -137,9 +135,6 @@ def pick(train_set, test_set, n_train, n_test):
 def evaluate_ensemble(train_set, test_set,
                       ensemble_params, transformer_params):
     (images_train, y_train), (images_test, y_test) = train_set, test_set
-
-    print("Train set: {}".format(train_set[0].shape))
-    print("Test set : {}".format(test_set[0].shape))
 
     model, accuracy, train_time, predict_time = run_pcanet_ensemble(
         ensemble_params, transformer_params,
@@ -250,7 +245,7 @@ def run_cifar(n_train=None, n_test=None, model_type="normal"):
         "filter_shape_pooling": 8, "step_shape_pooling": 4
     }
     ensemble_params = {
-        "n_estimators" : 20,
+        "n_estimators" : 10,
         "sampling_ratio" : 0.1,
         "n_jobs" : -1
     }
@@ -279,4 +274,4 @@ if __name__ == "__main__":
     # print("MNIST")
     # run_mnist(n_train=200, n_test=200, model_type="ensemble")
     print("CIFAR")
-    run_cifar(n_train=32, n_test=32, model_type="ensemble")
+    run_cifar(n_train=None, n_test=None, model_type="normal")

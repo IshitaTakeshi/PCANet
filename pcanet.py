@@ -5,8 +5,8 @@ import itertools
 
 from chainer.cuda import to_gpu, to_cpu
 from chainer.functions import convolution_2d
-from chainer import functions as F
 
+import cupy
 import numpy as np
 from sklearn.decomposition import PCA, IncrementalPCA
 
@@ -34,7 +34,10 @@ def output_shape(ys, xs):
 
 class Patches(object):
     def __init__(self, image, filter_shape, step_shape):
-        assert(np.ndim(image) == 2)
+        assert(image.ndim == 2)
+
+        # should be either numpy.ndarray or cupy.ndarray
+        self.ndarray = type(image)
         self.image = image
         self.filter_shape = filter_shape
 
@@ -48,7 +51,7 @@ class Patches(object):
         """
         fh, fw = self.filter_shape
         it = list(itertools.product(self.ys, self.xs))
-        patches = np.ndarray((len(it), fh, fw), dtype=self.image.dtype)
+        patches = self.ndarray((len(it), fh, fw), dtype=self.image.dtype)
         for i, (y, x) in enumerate(it):
             patches[i, :, :] = self.image[y:y+fh, x:x+fw]
         return patches
@@ -108,7 +111,7 @@ def binary_to_decimal(X):
     """
     Parameters
     ----------
-    X: np.ndarray
+    X: cupy.ndarray
         Feature maps
     """
     # This function expects X of shape (n_images, L2, y, x)
@@ -120,9 +123,9 @@ def binary_to_decimal(X):
     # a[0] * map_k[0] + a[1] * map_k[1] + ... + a[L2-1] * map_k[L2-1]
     # for each X[k], where a = [2^(L2-1), 2^(L2-2), ..., 2^0]
     # Therefore, the output shape must be (n_images, y, x)
-    a = np.arange(X.shape[1])[::-1]
-    a = np.power(2, a)
-    return np.tensordot(X, a, axes=([1], [0]))
+    a = cupy.arange(X.shape[1])[::-1]
+    a = cupy.power(2, a)
+    return cupy.tensordot(X, a, axes=([1], [0]))
 
 
 def to_tuple_if_int(value):
@@ -206,7 +209,7 @@ class PCANet(object):
         k = pow(2, self.n_l2_output)
         if self.n_bins is None:
             self.n_bins = k + 1
-        bins = np.linspace(-0.5, k - 0.5, self.n_bins)
+        bins = cupy.linspace(-0.5, k - 0.5, self.n_bins)
 
         def bhist(image):
             # calculate Bhist(T) in the original paper
@@ -214,8 +217,8 @@ class PCANet(object):
                 image,
                 self.filter_shape_pooling,
                 self.step_shape_pooling).patches
-            return np.concatenate([histogram(p.flatten(), bins) for p in ps])
-        return np.array([bhist(image) for image in binary_images])
+            return cupy.concatenate([histogram(p.flatten(), bins) for p in ps])
+        return cupy.vstack([bhist(image) for image in binary_images])
 
     def process_input(self, images):
         assert(np.ndim(images) >= 3)
@@ -267,7 +270,7 @@ class PCANet(object):
             self.pca_l2.partial_fit(patches)
         return self
 
-    def transform(self, images):
+    def transform_batch(self, images):
         images = self.process_input(images)
         # images.shape == (n_images, n_channels, y, x)
 
@@ -283,44 +286,56 @@ class PCANet(object):
             filter_shape=self.filter_shape_l2
         )
 
-        images = to_gpu(images)
-        filters_l1 = to_gpu(filters_l1)
-        filters_l2 = to_gpu(filters_l2)
+        with cupy.cuda.profile():
+            images = to_gpu(images)
+            filters_l1 = to_gpu(filters_l1)
+            filters_l2 = to_gpu(filters_l2)
 
-        images = convolution_2d(
-            images,
-            filters_l1,
-            stride=self.step_shape_l1
-        )
-
-        images = F.swapaxes(images, 0, 1)
-
-        # L1.shape == (L1, n_images, y, x)
-        # iterate over each L1 output
-
-        X = []
-        for maps in images:
-            n_images, h, w = maps.shape
-            maps = convolution_2d(
-                maps.reshape(n_images, 1, h, w),  # regard as 1 channel images
-                filters_l2,
-                stride=self.step_shape_l2
+            images = convolution_2d(
+                images,
+                filters_l1,
+                stride=self.step_shape_l1
             ).data
 
-            maps = to_cpu(maps)
-            # maps.shape == (n_images, L2, y, x) right here
-            maps = binarize(maps)
-            maps = binary_to_decimal(maps)
-            # maps.shape == (n_images, y, x)
-            x = self.histogram(maps)
+            images = cupy.swapaxes(images, 0, 1)
 
-            # x is a set of feature vectors.
-            # The shape of x is (n_images, vector length)
-            X.append(x)
-        X = np.hstack(X)
-        # concatenate over L1
+            # L1.shape == (L1, n_images, y, x)
+            # iterate over each L1 output
+
+            X = []
+            for maps in images:
+                n_images, h, w = maps.shape
+                maps = convolution_2d(
+                    maps.reshape(n_images, 1, h, w),  # regard as 1 channel images
+                    filters_l2,
+                    stride=self.step_shape_l2
+                ).data
+
+                # maps.shape == (n_images, L2, y, x) right here
+                maps = binarize(maps)
+                maps = binary_to_decimal(maps)
+                # maps.shape == (n_images, y, x)
+                x = self.histogram(maps)
+                # x is a set of feature vectors.
+                # The shape of x is (n_images, vector length)
+                X.append(x)
+
+            # concatenate over L1
+            X = cupy.hstack(X)
+
+        X = to_cpu(X)
+        X = X.astype(np.float64)
+
         # The shape of X is (n_images, L1 * vector length)
-        return X.astype(np.float64)
+        return X
+
+    def transform(self, images, batch_size=1024):
+        X = []
+        for i in range(0, len(images), batch_size):
+            # separate into batches and transform each for memory efficiency
+            W = self.transform_batch(images[i:i+batch_size])
+            X.append(W)
+        return np.vstack(X)
 
     def validate_structure(self):
         """
