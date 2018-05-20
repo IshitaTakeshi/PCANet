@@ -7,7 +7,6 @@ from cupy.testing import assert_array_equal
 from pcanet import Patches, PCANet, image_to_patch_vectors
 from pcanet import binarize, binary_to_decimal, to_tuple_if_int
 from ensemble import most_frequent_label
-from histogram import histogram
 
 
 class TestPatches(unittest.TestCase):
@@ -88,16 +87,6 @@ class TestPCANet(unittest.TestCase):
         assert_array_equal(binary_to_decimal(image), expected)
 
     def test_histogram(self):
-        k = pow(2, 3)
-        x = cupy.array([0, 1, 5, 6, 7, 1, 3, 7, 1])
-        expected = cupy.array([1, 3, 0, 1, 0, 1, 1, 2])
-        assert_array_equal(histogram(x, cupy.linspace(-0.5, k-0.5, k+1)), expected)
-
-        k = pow(2, 2)
-        x = cupy.array([0, 1, 2, 3, 1, 1, 2, 3, 1])
-        expected = cupy.array([1, 4, 2, 2])
-        assert_array_equal(histogram(x, cupy.linspace(-0.5, k-0.5, k+1)), expected)
-
         images = cupy.array([
             [[0, 1, 1, 3],
              [3, 1, 2, 2],
