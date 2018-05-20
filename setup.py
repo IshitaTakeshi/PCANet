@@ -7,16 +7,13 @@ setup(
     author="Takeshi Ishita",
     py_modules=["pcanet"],
     install_requires=[
+        'cupy==5.0.0a1',
         'chainer',
         'numpy',
         'psutil',
         'recommonmark',
         'scikit-learn',
         'scipy',
-        'sphinx'
-    ],
-
-    dependency_links = [
-        '-e git://github.com/cupy/cupy.git#egg=cupy'
+        'sphinx',
     ]
 )
