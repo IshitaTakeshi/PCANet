@@ -1,6 +1,5 @@
 import os
 from os.path import exists, join
-import pickle
 import json
 import gzip
 from argparse import ArgumentParser
@@ -17,10 +16,10 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn.utils import shuffle
-from chainer.datasets import get_mnist, get_cifar10
 
 from pcanet import PCANet
 from ensemble import Bagging
+import utils
 
 
 pickle_dir = "pickles"
@@ -38,7 +37,6 @@ def run_classifier(X_train, X_test, y_train, y_test):
     return y_test, y_pred
 
 
-@profile
 def run_pcanet_normal(transformer_params,
                       images_train, images_test, y_train, y_test):
     model = PCANet(**transformer_params)
@@ -114,22 +112,9 @@ def parse_args():
     return parser.parse_args()
 
 
-def save_model(model, filename):
-    with open(filename, "wb") as f:
-        pickle.dump(model, f)
-
-
 def model_filename():
     t = str(time.time()).encode("utf-8")
     return hashlib.sha256(t).hexdigest() + ".pkl"
-
-
-def pick(train_set, test_set, n_train, n_test):
-    images_train, y_train = train_set
-    images_test, y_test = test_set
-    train_set = images_train[:n_train], y_train[:n_train]
-    test_set = images_test[:n_test], y_test[:n_test]
-    return train_set, test_set
 
 
 def evaluate_ensemble(train_set, test_set,
@@ -142,7 +127,7 @@ def evaluate_ensemble(train_set, test_set,
     )
 
     filename = model_filename()
-    save_model(model, join(pickle_dir, filename))
+    utils.save_model(model, join(pickle_dir, filename))
 
     params = {}
     params["ensemble-model"] = filename
@@ -161,7 +146,7 @@ def evaluate_normal(train_set, test_set, transformer_params):
     )
 
     filename = model_filename()
-    save_model(model, join(pickle_dir, filename))
+    utils.save_model(model, join(pickle_dir, filename))
 
     params = {}
     params["normal-model"] = filename
@@ -169,13 +154,6 @@ def evaluate_normal(train_set, test_set, transformer_params):
     params["normal-train-time"] = train_time
     params["normal-transform-time"] = transform_time
     return params
-
-
-def concatenate_dicts(*dicts):
-    merged = []
-    for d in dicts:
-        merged += list(d.items())
-    return dict(merged)
 
 
 def export_json(result, filename):
@@ -187,8 +165,10 @@ def run(dataset, datasize, transformer_params, ensemble_params,
         model_type, filename="result.json"):
     train_set, test_set = dataset
 
-    train_set, test_set = pick(train_set, test_set,
-                               datasize["n_train"], datasize["n_test"])
+    train_set, test_set = utils.pick(
+        train_set, test_set,
+        datasize["n_train"], datasize["n_test"]
+    )
 
     # Set the actual data size
     datasize["n_train"], datasize["n_test"] = len(train_set[1]), len(test_set[1])
@@ -201,7 +181,7 @@ def run(dataset, datasize, transformer_params, ensemble_params,
     else:
         raise ValueError("Invalid model type '{}'".format(model_type))
 
-    params = concatenate_dicts(
+    params = utils.concatenate_dicts(
         datasize,
         transformer_params,
         ensemble_params,
@@ -212,28 +192,6 @@ def run(dataset, datasize, transformer_params, ensemble_params,
 
     export_json(params, filename)
     print(json.dumps(params, sort_keys=True))
-
-
-def reshape_dataset(train, test):
-    def channels_last(X):
-        X = np.swapaxes(X, 1, 2)
-        X = np.swapaxes(X, 2, 3)
-        return X
-
-    X_train, y_train = train._datasets[0], train._datasets[1]
-    X_test, y_test = test._datasets[0], test._datasets[1]
-    X_train, X_test = channels_last(X_train), channels_last(X_test)
-    return ((X_train, y_train), (X_test, y_test))
-
-
-def load_cifar():
-    train, test = get_cifar10(ndim=3)
-    return reshape_dataset(train, test)
-
-
-def load_mnist():
-    train, test = get_mnist(ndim=3)
-    return reshape_dataset(train, test)
 
 
 def run_cifar(n_train=None, n_test=None, model_type="normal"):
@@ -249,7 +207,7 @@ def run_cifar(n_train=None, n_test=None, model_type="normal"):
         "sampling_ratio" : 0.1,
         "n_jobs" : -1
     }
-    dataset = load_cifar()
+    dataset = utils.load_cifar()
     run(dataset, datasize, transformer_params, ensemble_params, model_type)
 
 
@@ -266,12 +224,12 @@ def run_mnist(n_train=None, n_test=None, model_type="normal"):
         "sampling_ratio" : 0.03,
         "n_jobs" : -1
     }
-    dataset = load_mnist()
+    dataset = utils.load_mnist()
     run(dataset, datasize, transformer_params, ensemble_params, model_type)
 
 
 if __name__ == "__main__":
-    # print("MNIST")
-    # run_mnist(n_train=200, n_test=200, model_type="ensemble")
-    print("CIFAR")
-    run_cifar(n_train=None, n_test=None, model_type="normal")
+    print("MNIST")
+    run_mnist(n_train=100, n_test=100, model_type="ensemble")
+    # print("CIFAR")
+    # run_cifar(n_train=None, n_test=None, model_type="normal")
