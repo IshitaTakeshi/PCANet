@@ -22,10 +22,15 @@ def reshape_dataset(train, test):
     return ((X_train, y_train), (X_test, y_test))
 
 
-
 def save_model(model, filename):
     with open(filename, "wb") as f:
         pickle.dump(model, f)
+
+
+def load_model(filename):
+    with open(filename, "rb") as f:
+        model = pickle.load(f)
+    return model
 
 
 def pick(train_set, test_set, n_train, n_test):
