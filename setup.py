@@ -13,6 +13,10 @@ setup(
         'recommonmark',
         'scikit-learn',
         'scipy',
-        'sphinx',
+        'sphinx'
     ],
+
+    dependency_links = [
+        '-e git://github.com/cupy/cupy.git#egg=cupy'
+    ]
 )
