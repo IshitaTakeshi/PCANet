@@ -2,6 +2,12 @@ import numpy as np
 import pickle
 
 from chainer.datasets import get_mnist, get_cifar10
+from chainer.cuda import get_device
+
+
+def check_gpu_enabled():
+    """Return true if GPU is available"""
+    return get_device().id >= 0
 
 
 def reshape_dataset(train, test):
