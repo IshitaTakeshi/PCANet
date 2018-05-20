@@ -215,7 +215,9 @@ class PCANet(object):
                 image,
                 self.filter_shape_pooling,
                 self.step_shape_pooling).patches
-            return cupy.concatenate([histogram(p.flatten(), bins) for p in ps])
+
+            H = [cupy.histogram(p.flatten(), bins)[0] for p in ps]
+            return cupy.concatenate(H)
         return cupy.vstack([bhist(image) for image in binary_images])
 
     def process_input(self, images):
