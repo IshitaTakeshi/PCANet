@@ -48,8 +48,6 @@ class Bagging(object):
             Parameters for PCANet.__init__
         """
 
-        self.n_estimators = n_estimators
-
         self.transformers = \
             [PCANet(**transformer_params) for i in range(n_estimators)]
         # Validate only the first transformer
@@ -63,39 +61,25 @@ class Bagging(object):
         if n_jobs == -1:
             self.n_jobs = cpu_count()
 
-    def fit(self, images, y, batch_size=32):
-        for i in range(0, self.n_estimators, batch_size):
-            # with Pool(processes=self.n_jobs) as pool:
-            g = zip(
-                self.transformers[i:i+batch_size],
-                self.estimators[i:i+batch_size],
-                repeat(images),
-                repeat(y),
-                repeat(self.sampling_ratio)
-            )
-            t = [fit_random(*args) for args in g]
-            #   t = pool.starmap(fit_random, g)
-            ts, es = zip(*t)
-            self.transformers[i:i+batch_size] = ts
-            self.estimators[i:i+batch_size] = es
+    def fit(self, images, y):
+        # run fit_random in parallel
+        g = zip(
+            self.transformers,
+            self.estimators,
+            repeat(images),
+            repeat(y),
+            repeat(self.sampling_ratio)
+        )
+        with Pool(processes=self.n_jobs) as pool:
+            t = pool.starmap(fit_random, g)
+        self.transformers, self.estimators = zip(*t)
         return self
 
-    def predict(self, images, batch_size=32):
-        def predict_(transformers, estimators):
-            g = zip(transformers, estimators, repeat(images))
-            # with Pool(processes=self.n_jobs) as pool:
-            #   Y = pool.starmap(predict, g)
-            Y = [predict(*args) for args in g]
-            Y = np.array(Y)  # Y is of shape (n_estimators, n_classes)
-            y = [most_frequent_label(Y[:, i]) for i in range(Y.shape[1])]
-            return y
-
-        y = []
+    def predict(self, images):
         # run transform(transformer, images) in parallel
-        for i in range(0, self.n_estimators, batch_size):
-            y_ = predict_(
-                self.transformers[i:i+batch_size],
-                self.estimators[i:i+batch_size]
-            )
-            y.append(y_)
-        return np.concatenate(y)
+        g = zip(self.transformers, self.estimators, repeat(images))
+        with Pool(processes=self.n_jobs) as pool:
+            Y = pool.starmap(predict, g)
+        Y = np.array(Y)  # Y is of shape (n_estimators, n_classes)
+        y = [most_frequent_label(Y[:, i]) for i in range(Y.shape[1])]
+        return np.array(y)
