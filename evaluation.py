@@ -10,12 +10,10 @@ from urllib.request import urlopen
 import tarfile
 
 import numpy as np
-from sklearn.datasets import fetch_mldata
+
 from sklearn.svm import LinearSVC, SVC
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-from sklearn.utils import shuffle
 
 from pcanet import PCANet
 from ensemble import Bagging
