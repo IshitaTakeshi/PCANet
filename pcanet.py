@@ -306,7 +306,7 @@ class PCANet(object):
             for maps in images:
                 n_images, h, w = maps.shape
                 maps = convolution_2d(
-                    maps.reshape(n_images, 1, h, w),  # regard as 1 channel images
+                    maps.reshape(n_images, 1, h, w),  # 1 channel images
                     filters_l2,
                     stride=self.step_shape_l2
                 ).data
@@ -358,4 +358,8 @@ class PCANet(object):
         output_shape_l2 = is_valid_(output_shape_l1,
                                     self.filter_shape_l2,
                                     self.step_shape_l2)
-        is_valid_(output_shape_l2, self.filter_shape_pooling, self.filter_shape_pooling)
+        is_valid_(
+            output_shape_l2,
+            self.filter_shape_pooling,
+            self.filter_shape_pooling
+        )
