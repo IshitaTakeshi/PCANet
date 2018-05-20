@@ -1,14 +1,20 @@
-# We recommend you to see [the original paper](https://arxiv.org/abs/1404.3606)
-# before reading the code below.
+# [the original paper](https://arxiv.org/abs/1404.3606)
 
 import itertools
 
-from chainer.cuda import to_gpu, to_cpu
+from chainer.cuda import to_gpu, to_cpu, get_device
 from chainer.functions import convolution_2d
 
-import cupy
 import numpy as np
 from sklearn.decomposition import IncrementalPCA
+
+
+GPU_ENABLED = (get_device().id >= 0)
+
+if GPU_ENABLED:
+    import cupy as xp
+else:
+    import numpy as xp
 
 
 def steps(image_shape, filter_shape, step_shape):
@@ -109,7 +115,7 @@ def binary_to_decimal(X):
     """
     Parameters
     ----------
-    X: cupy.ndarray
+    X: xp.ndarray
         Feature maps
     """
     # This function expects X of shape (n_images, L2, y, x)
@@ -121,9 +127,9 @@ def binary_to_decimal(X):
     # a[0] * map_k[0] + a[1] * map_k[1] + ... + a[L2-1] * map_k[L2-1]
     # for each X[k], where a = [2^(L2-1), 2^(L2-2), ..., 2^0]
     # Therefore, the output shape must be (n_images, y, x)
-    a = cupy.arange(X.shape[1])[::-1]
-    a = cupy.power(2, a)
-    return cupy.tensordot(X, a, axes=([1], [0]))
+    a = xp.arange(X.shape[1])[::-1]
+    a = xp.power(2, a)
+    return xp.tensordot(X, a, axes=([1], [0]))
 
 
 def to_tuple_if_int(value):
@@ -207,7 +213,7 @@ class PCANet(object):
         k = pow(2, self.n_l2_output)
         if self.n_bins is None:
             self.n_bins = k + 1
-        bins = cupy.linspace(-0.5, k - 0.5, self.n_bins)
+        bins = xp.linspace(-0.5, k - 0.5, self.n_bins)
 
         def bhist(image):
             # calculate Bhist(T) in the original paper
@@ -216,9 +222,9 @@ class PCANet(object):
                 self.filter_shape_pooling,
                 self.step_shape_pooling).patches
 
-            H = [cupy.histogram(p.flatten(), bins)[0] for p in ps]
-            return cupy.concatenate(H)
-        return cupy.vstack([bhist(image) for image in binary_images])
+            H = [xp.histogram(p.flatten(), bins)[0] for p in ps]
+            return xp.concatenate(H)
+        return xp.vstack([bhist(image) for image in binary_images])
 
     def process_input(self, images):
         assert(np.ndim(images) >= 3)
@@ -286,44 +292,46 @@ class PCANet(object):
             filter_shape=self.filter_shape_l2
         )
 
-        with cupy.cuda.profile():
+        if GPU_ENABLED:
             images = to_gpu(images)
             filters_l1 = to_gpu(filters_l1)
             filters_l2 = to_gpu(filters_l2)
 
-            images = convolution_2d(
-                images,
-                filters_l1,
-                stride=self.step_shape_l1
+        images = convolution_2d(
+            images,
+            filters_l1,
+            stride=self.step_shape_l1
+        ).data
+
+        images = xp.swapaxes(images, 0, 1)
+
+        # L1.shape == (L1, n_images, y, x)
+        # iterate over each L1 output
+
+        X = []
+        for maps in images:
+            n_images, h, w = maps.shape
+            maps = convolution_2d(
+                maps.reshape(n_images, 1, h, w),  # 1 channel images
+                filters_l2,
+                stride=self.step_shape_l2
             ).data
 
-            images = cupy.swapaxes(images, 0, 1)
+            # maps.shape == (n_images, L2, y, x) right here
+            maps = binarize(maps)
+            maps = binary_to_decimal(maps)
+            # maps.shape == (n_images, y, x)
+            x = self.histogram(maps)
+            # x is a set of feature vectors.
+            # The shape of x is (n_images, vector length)
+            X.append(x)
 
-            # L1.shape == (L1, n_images, y, x)
-            # iterate over each L1 output
+        # concatenate over L1
+        X = xp.hstack(X)
 
-            X = []
-            for maps in images:
-                n_images, h, w = maps.shape
-                maps = convolution_2d(
-                    maps.reshape(n_images, 1, h, w),  # 1 channel images
-                    filters_l2,
-                    stride=self.step_shape_l2
-                ).data
+        if GPU_ENABLED:
+            X = to_cpu(X)
 
-                # maps.shape == (n_images, L2, y, x) right here
-                maps = binarize(maps)
-                maps = binary_to_decimal(maps)
-                # maps.shape == (n_images, y, x)
-                x = self.histogram(maps)
-                # x is a set of feature vectors.
-                # The shape of x is (n_images, vector length)
-                X.append(x)
-
-            # concatenate over L1
-            X = cupy.hstack(X)
-
-        X = to_cpu(X)
         X = X.astype(np.float64)
 
         # The shape of X is (n_images, L1 * vector length)
