@@ -132,7 +132,7 @@ def binary_to_decimal(X):
     # as an argument.
     # Let's say that X[k] (0 <= k < n_images) can be represented like
     # X[k] = [map_k[0], map_k[1], ..., map_k[L2-1]]
-    # where the shape of each map_k is (y, x).
+    # where the shape of each map_k[i] is (y, x).
     # Then we calculate
     # a[0] * map_k[0] + a[1] * map_k[1] + ... + a[L2-1] * map_k[L2-1]
     # for each X[k], where a = [2^(L2-1), 2^(L2-2), ..., 2^0]
