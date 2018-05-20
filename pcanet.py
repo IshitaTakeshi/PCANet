@@ -8,7 +8,7 @@ from chainer.functions import convolution_2d
 
 import cupy
 import numpy as np
-from sklearn.decomposition import PCA, IncrementalPCA
+from sklearn.decomposition import IncrementalPCA
 
 
 def steps(image_shape, filter_shape, step_shape):
