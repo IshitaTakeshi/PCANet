@@ -1,12 +1,11 @@
-from multiprocessing import Pool
+from multiprocessing import cpu_count
 from itertools import repeat
 
-from sklearn.svm import LinearSVC
-from sklearn.externals.joblib import Parallel, delayed
+from sklearn.svm import SVC
+from multiprocessing import Pool
 from numpy.random import randint
 from pcanet import PCANet
 import numpy as np
-from tqdm import tqdm
 
 
 def most_frequent_label(v):
@@ -35,7 +34,7 @@ def fit_random(transformer, estimator, images, y, sampling_ratio):
 
 
 class Bagging(object):
-    def __init__(self, n_estimators, sampling_ratio, n_jobs,
+    def __init__(self, n_estimators, sampling_ratio, n_jobs=-1,
                  **transformer_params):
         """
         n_estimators: int
@@ -54,27 +53,33 @@ class Bagging(object):
         # Validate only the first transformer
         # since all of transformers share the same hyperparameters
         self.transformers[0].validate_structure()
-        self.estimators = \
-            [LinearSVC(C=10) for i in range(n_estimators)]
+        self.estimators = [SVC(C=1e8) for i in range(n_estimators)]
 
         self.sampling_ratio = sampling_ratio
+
         self.n_jobs = n_jobs
+        if n_jobs == -1:
+            self.n_jobs = cpu_count()
 
     def fit(self, images, y):
         # run fit_random in parallel
-        g = zip(self.transformers,
-                self.estimators,
-                repeat(images),
-                repeat(y),
-                repeat(self.sampling_ratio))
-        t = Parallel(n_jobs=self.n_jobs)(delayed(fit_random)(*a) for a in g)
+        g = zip(
+            self.transformers,
+            self.estimators,
+            repeat(images),
+            repeat(y),
+            repeat(self.sampling_ratio)
+        )
+        with Pool(processes=self.n_jobs) as pool:
+            t = pool.starmap(fit_random, g)
         self.transformers, self.estimators = zip(*t)
         return self
 
     def predict(self, images):
         # run transform(transformer, images) in parallel
         g = zip(self.transformers, self.estimators, repeat(images))
-        Y = Parallel(n_jobs=self.n_jobs)(delayed(predict)(*a) for a in g)
+        with Pool(processes=self.n_jobs) as pool:
+            Y = pool.starmap(predict, g)
         Y = np.array(Y)  # Y is of shape (n_estimators, n_classes)
         y = [most_frequent_label(Y[:, i]) for i in range(Y.shape[1])]
         return np.array(y)

@@ -2,9 +2,11 @@ import unittest
 import numpy as np
 from numpy.testing import assert_array_equal
 
-from pcanet import Patches, PCANet, normalize_patches, convolution, binarize
-from pcanet import binary_to_decimal, to_tuple_if_int
+from pcanet import Patches, PCANet, image_to_patch_vectors
+from pcanet import binarize, binary_to_decimal, convolution, to_tuple_if_int
 from ensemble import most_frequent_label
+from histogram import histogram
+
 
 class TestPatches(unittest.TestCase):
     def test_kernel_startpoints(self):
@@ -14,107 +16,82 @@ class TestPatches(unittest.TestCase):
         image_shape = (10, 8)
         filter_shape = (4, 3)
         step_shape = (1, 2)
-        images = np.zeros((1, *image_shape))
-        patches = Patches(images, filter_shape, step_shape)
+        image = np.zeros(image_shape)
+        patches = Patches(image, filter_shape, step_shape)
         self.assertEqual(list(patches.ys), [0, 1, 2, 3, 4, 5, 6])
         self.assertEqual(list(patches.xs), [0, 2, 4])
 
     def test_patches(self):
-        # Supporse that images below aregeven.
+        # Supporse that image below is geven.
         # [[0 1 2]
         #  [3 4 5]
         #  [6 7 8]]
-        # [[0 3 1]
-        #  [3 1 1]
-        #  [2 0 0]]
         #
         # If the patches are squares and its size = 2, and the step size = 1
-        # then the extracted patches should be like below.
-        # From the first image:
+        # the extracted patches should be like below.
         # [0 1]  [1 2]  [3 4]  [4 5]
         # [3 4]  [4 5]  [6 7]  [7 8]
-        # From the second image:
-        # [0 3]  [3 1]  [3 1]  [1 1]
-        # [3 1]  [1 1]  [2 0]  [0 0]
-        images = np.array([
-         [[0, 1, 2],
-          [3, 4, 5],
-          [6, 7, 8]],
-         [[0, 3, 1],
-          [3, 1, 1],
-          [2, 0, 0]]
-        ])
 
-        patches = Patches(images, (2, 2), (1, 1)).patches
+        image = np.array(
+            [[0, 3, 1],
+             [3, 1, 1],
+             [2, 0, 0]]
+        )
+
+        patches = Patches(image, (2, 2), (1, 1)).patches
         expected = np.array([
-            [[[0, 1],
-              [3, 4]],
-             [[1, 2],
-              [4, 5]],
-             [[3, 4],
-              [6, 7]],
-             [[4, 5],
-              [7, 8]]],
-            [[[0, 3],
-              [3, 1]],
-             [[3, 1],
-              [1, 1]],
-             [[3, 1],
-              [2, 0]],
-             [[1, 1],
-              [0, 0]]],
+            [[0, 3],
+             [3, 1]],
+            [[3, 1],
+             [1, 1]],
+            [[3, 1],
+             [2, 0]],
+            [[1, 1],
+             [0, 0]]
         ])
         assert_array_equal(patches, expected)
 
 
 class TestPCANet(unittest.TestCase):
-    def test_images_to_patches(self):
-        # TODO
-        pass
-
     def test_convolution(self):
         images = np.array([
-            [[0, 2, 1],
-             [2, 3, 0],
-             [1, 1, 1]],
-            [[3, 1, 0],
-             [1, 2, 2],
-             [2, 1, 1]]
-        ])
+            [[[0, 2],
+              [1, 1]],
+             [[3, 1],
+              [2, 1]]],
+            [[[0, 0],
+              [1, 1]],
+             [[4, 1],
+              [2, 2]]]
+        ], dtype=np.float64)
+
         filters = np.array([
-            [[1, 1],
-             [1, 1]],
-            [[1, 1],
-             [0, 2]]
-        ])
+            [[1, 1, 1, 1, 1, 1, 0, 2]]
+        ], dtype=np.float64)
+
         T = convolution(images, filters, (2, 2), (1, 1))
         expected = np.array([
-            [[[7, 6],
-              [7, 5]],
-             [[7, 5],
-              [6, 6]]],
-            [[[8, 3],
-              [7, 5]],
-             [[8, 5],
-              [5, 6]]]
+            [[[10]]],
+            [[[11]]]
         ])
         assert_array_equal(T, expected)
 
-        # images = np.array([
-        #     [[1, 3, 2],
-        #      [4, 1, 5],
-        #      [3, 2, 6]]
-        # ])
-        # filter_ = np.array([
-        #     [1, 2],
-        #     [3, 1]
-        # ])
-        # T = convolution(images, filter_, (2, 2), (1, 1))
-        # expected = np.array([[
-        #     [20, 15],
-        #     [17, 23]
-        # ]])
-        # assert_array_equal(T, expected)
+        images = np.array([
+            [[[1, 3, 2],
+              [4, 1, 5],
+              [3, 2, 6]]]
+        ], dtype=np.float64)
+
+        filters = np.array([
+            [[1, 2, 3, 1]]
+        ], dtype=np.float64)
+
+        T = convolution(images, filters, (2, 2), (1, 1))
+        expected = np.array([[
+            [[20, 15],
+             [17, 23]]
+        ]])
+        assert_array_equal(T, expected)
 
     def test_binarize(self):
         image = np.array([
@@ -149,6 +126,16 @@ class TestPCANet(unittest.TestCase):
         assert_array_equal(binary_to_decimal(image), expected)
 
     def test_histogram(self):
+        k = pow(2, 3)
+        x = np.array([0, 1, 5, 6, 7, 1, 3, 7, 1])
+        expected = np.array([1, 3, 0, 1, 0, 1, 1, 2])
+        assert_array_equal(histogram(x, np.linspace(-0.5, k-0.5, k+1)), expected)
+
+        k = pow(2, 2)
+        x = np.array([0, 1, 2, 3, 1, 1, 2, 3, 1])
+        expected = np.array([1, 4, 2, 2])
+        assert_array_equal(histogram(x, np.linspace(-0.5, k-0.5, k+1)), expected)
+
         images = np.array([
             [[0, 1, 1, 3],
              [3, 1, 2, 2],
@@ -164,8 +151,27 @@ class TestPCANet(unittest.TestCase):
             [1, 1, 1, 1, 1, 2, 1, 0, 0, 1, 2, 1, 0, 1, 1, 2]
         ])
         pcanet = PCANet(None, None, None, None, None, None,
-                        n_l2_output=2, block_shape=(2, 2))
-        # assume that n_l1_output = 2
+                        n_l2_output=2,
+                        filter_shape_pooling=2,
+                        step_shape_pooling=2)
+        assert_array_equal(pcanet.histogram(images), expected)
+
+        images = np.array([
+            [[1, 0, 1],
+             [2, 0, 0],
+             [1, 3, 3]],
+            [[2, 0, 0],
+             [1, 1, 1],
+             [3, 0, 1]]
+        ])
+        expected = np.array([
+            [2, 1, 1, 0, 3, 1, 0, 0, 1, 1, 1, 1, 2, 0, 0, 2],
+            [1, 2, 1, 0, 2, 2, 0, 0, 1, 2, 0, 1, 1, 3, 0, 0]
+        ])
+        pcanet = PCANet(None, None, None, None, None, None,
+                        n_l2_output=2,
+                        filter_shape_pooling=2,
+                        step_shape_pooling=1)
         assert_array_equal(pcanet.histogram(images), expected)
 
     def test_to_tuple_if_int(self):
@@ -174,28 +180,22 @@ class TestPCANet(unittest.TestCase):
         # do nothing if non-integer is given
         self.assertEqual(to_tuple_if_int((10, 10)), (10, 10))
 
-    def test_normalize_patches(self):
-        patches = np.array([
-            [[[0, 3],
-              [1, 5]],
-             [[2, 1],
-              [1, 1]]],
-            [[[1, 3],
-              [0, 2]],
-             [[1, 1],
-              [2, 2]]]
+    def test_image_to_patch_vectors(self):
+        image = np.array([
+            [0, 2, 1, 5],
+            [2, 0, 1, 1],
+            [3, 3, 0, 2],
         ])
         expected = np.array([
-            [[[-1, 1],
-              [0, 2]],
-             [[1, -1],
-              [0, -2]]],
-            [[[0, 1],
-              [-1, 0]],
-             [[0, -1],
-              [1, 0]]]
+            [-1, 1, 1, -1],
+            [1, 0, -1, 0],
+            [-1, 3, -1, -1],
+            [0, -2, 1, 1],
+            [-1, 0, 2, -1],
+            [0, 0, -1, 1]
         ])
-        assert_array_equal(normalize_patches(patches), expected)
+        patches = image_to_patch_vectors(image, (2, 2), (1, 1))
+        assert_array_equal(patches, expected)
 
     def test_validate_structure(self):
         # Check whether filters visit all pixels of input images
@@ -203,7 +203,7 @@ class TestPCANet(unittest.TestCase):
             image_shape=9,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=1, n_l2_output=1,
-            block_shape=1
+            filter_shape_pooling=1, step_shape_pooling=1
         )
         pcanet.validate_structure()
 
@@ -211,7 +211,7 @@ class TestPCANet(unittest.TestCase):
             image_shape=10,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=1, n_l2_output=1,
-            block_shape=1
+            filter_shape_pooling=1, step_shape_pooling=1
         )
         self.assertRaises(ValueError, pcanet.validate_structure)
 
@@ -221,7 +221,7 @@ class TestPCANet(unittest.TestCase):
             image_shape=13,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=1, n_l2_output=1,
-            block_shape=1
+            filter_shape_pooling=1, step_shape_pooling=1
         )
         pcanet.validate_structure()
 
@@ -229,7 +229,7 @@ class TestPCANet(unittest.TestCase):
             image_shape=13,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
-            block_shape=1
+            filter_shape_pooling=1, step_shape_pooling=1
         )
         self.assertRaises(ValueError, pcanet.validate_structure)
 
@@ -240,7 +240,7 @@ class TestPCANet(unittest.TestCase):
             image_shape=19,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
-            block_shape=2
+            filter_shape_pooling=2, step_shape_pooling=2
         )
         pcanet.validate_structure()
 
@@ -248,7 +248,7 @@ class TestPCANet(unittest.TestCase):
             image_shape=19,
             filter_shape_l1=3, step_shape_l1=2, n_l1_output=1,
             filter_shape_l2=3, step_shape_l2=2, n_l2_output=1,
-            block_shape=3
+            filter_shape_pooling=3, step_shape_pooling=1
         )
         self.assertRaises(ValueError, pcanet.validate_structure)
 

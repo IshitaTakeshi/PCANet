@@ -1,22 +1,23 @@
+import os
 from os.path import exists, join
 import pickle
 import json
 import gzip
-from urllib.request import urlretrieve
 from argparse import ArgumentParser
 import hashlib
 import time
 import timeit
-from multiprocessing import cpu_count
+from urllib.request import urlopen
+import tarfile
 
 import numpy as np
-from mnist import MNIST
 from sklearn.datasets import fetch_mldata
-from sklearn.svm import LinearSVC
+from sklearn.svm import LinearSVC, SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn.utils import shuffle
+from chainer.datasets import get_mnist, get_cifar10
 
 from pcanet import PCANet
 from ensemble import Bagging
@@ -25,27 +26,13 @@ from ensemble import Bagging
 pickle_dir = "pickles"
 
 
-def load_mnist():
-    mnist = MNIST("mnist")
-    X_train, y_train = mnist.load_training()
-    X_test, y_test = mnist.load_testing()
-
-    X_train, y_train = np.array(X_train), np.array(y_train)
-    X_train = X_train.reshape(-1, 28, 28)
-    X_test, y_test = np.array(X_test), np.array(y_test)
-    X_test = X_test.reshape(-1, 28, 28)
-    train_set = X_train, y_train
-    test_set = X_test, y_test
-    return train_set, test_set
-
-
 def params_to_str(params):
     keys = sorted(params.keys())
     return "_".join([key + "_" + str(params[key]) for key in keys])
 
 
 def run_classifier(X_train, X_test, y_train, y_test):
-    model = LinearSVC(C=10)
+    model = SVC(C=10)
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
     return y_test, y_pred
@@ -59,18 +46,20 @@ def run_pcanet_normal(transformer_params,
     t1 = timeit.default_timer()
     model.fit(images_train)
     t2 = timeit.default_timer()
-    training_time = t2 - t1
+    train_time = t2 - t1
 
+    t1 = timeit.default_timer()
     X_train = model.transform(images_train)
+    t2 = timeit.default_timer()
+    transform_time = t2 - t1
     X_test = model.transform(images_test)
 
     y_test, y_pred = run_classifier(X_train, X_test, y_train, y_test)
     accuracy = accuracy_score(y_test, y_pred)
 
-    return model, accuracy, training_time
+    return model, accuracy, train_time, transform_time
 
 
-# TODO Change n_estimators and sampling_ratio on evaluation
 def run_pcanet_ensemble(ensemble_params, transformer_params,
                         images_train, images_test, y_train, y_test):
     model = Bagging(
@@ -82,13 +71,16 @@ def run_pcanet_ensemble(ensemble_params, transformer_params,
     t1 = timeit.default_timer()
     model.fit(images_train, y_train)
     t2 = timeit.default_timer()
-    training_time = t2 - t1
+    train_time = t2 - t1
 
+    t1 = timeit.default_timer()
     y_pred = model.predict(images_test)
+    t2 = timeit.default_timer()
+    predict_time = t2 - t1
 
     accuracy = accuracy_score(y_test, y_pred)
 
-    return model, accuracy, training_time
+    return model, accuracy, train_time, predict_time
 
 
 def parse_args():
@@ -108,7 +100,9 @@ def parse_args():
             required=True)
     parser.add_argument("--n-l2-output", dest="n_l2_output", type=int,
             required=True)
-    parser.add_argument("--block-shape", dest="block_shape", type=int,
+    parser.add_argument("--filter-shape-pooling", dest="filter_shape_pooling", type=int,
+            required=True)
+    parser.add_argument("--step-shape-pooling", dest="step_shape_pooling", type=int,
             required=True)
     parser.add_argument("--n-estimators", dest="n_estimators", type=int,
             required=True)
@@ -141,7 +135,7 @@ def evaluate_ensemble(train_set, test_set,
                       ensemble_params, transformer_params):
     (images_train, y_train), (images_test, y_test) = train_set, test_set
 
-    model, accuracy, training_time = run_pcanet_ensemble(
+    model, accuracy, train_time, predict_time = run_pcanet_ensemble(
         ensemble_params, transformer_params,
         images_train, images_test, y_train, y_test
     )
@@ -152,14 +146,15 @@ def evaluate_ensemble(train_set, test_set,
     params = {}
     params["ensemble-model"] = filename
     params["ensemble-accuracy"] = accuracy
-    params["ensemble-training-time"] = training_time
+    params["ensemble-train-time"] = train_time
+    params["ensemble-predict-time"] = predict_time
     return params
 
 
 def evaluate_normal(train_set, test_set, transformer_params):
     (images_train, y_train), (images_test, y_test) = train_set, test_set
 
-    model, accuracy, training_time = run_pcanet_normal(
+    model, accuracy, train_time, transform_time = run_pcanet_normal(
         transformer_params,
         images_train, images_test, y_train, y_test
     )
@@ -170,7 +165,8 @@ def evaluate_normal(train_set, test_set, transformer_params):
     params = {}
     params["normal-model"] = filename
     params["normal-accuracy"] = accuracy
-    params["normal-training-time"] = training_time
+    params["normal-train-time"] = train_time
+    params["normal-transform-time"] = transform_time
     return params
 
 
@@ -186,44 +182,95 @@ def export_json(result, filename):
         json.dump(result, f, sort_keys=True, indent=2)
 
 
-if __name__ == "__main__":
-    filename = "result.json"
+def run(dataset, datasize, transformer_params, ensemble_params,
+        model_type, filename="result.json"):
+    train_set, test_set = dataset
 
-    datasize = {
-        "n_train": None,
-        "n_test": None
-    }
-    transformer_params = {
-        "image_shape": 28,
-        "filter_shape_l1": 4, "step_shape_l1": 2, "n_l1_output": 3,
-        "filter_shape_l2": 4, "step_shape_l2": 1, "n_l2_output": 3,
-        "block_shape": 5
-    }
+    train_set, test_set = pick(train_set, test_set,
+                               datasize["n_train"], datasize["n_test"])
 
-    hyperparameters = concatenate_dicts(
+    # Set the actual data size
+    datasize["n_train"], datasize["n_test"] = len(train_set[1]), len(test_set[1])
+
+    if model_type == "normal":
+        result = evaluate_normal(train_set, test_set, transformer_params)
+    elif model_type == "ensemble":
+        result = evaluate_ensemble(train_set, test_set,
+                                   ensemble_params, transformer_params)
+    else:
+        raise ValueError("Invalid model type '{}'".format(model_type))
+
+    params = concatenate_dicts(
         datasize,
         transformer_params,
+        ensemble_params,
+        result
     )
 
-    train_set, test_set = load_mnist()
-    # train_set, test_set = pick(train_set, test_set,
-    #                            datasize["n_train"], datasize["n_test"])
+    params["model-type"] = model_type
 
-    result = evaluate_normal(train_set, test_set, transformer_params)
-    result = concatenate_dicts(hyperparameters, result)
-    result["type"] = "normal"
-    export_json(result, filename)
-    print(result)
+    export_json(params, filename)
+    print(json.dumps(params, sort_keys=True))
 
-    for sampling_ratio in np.arange(0.01, 0.11, 0.01):
-        for n_estimators in np.arange(10, 210, 10):
-            ensemble_params = hyperparameters
-            ensemble_params["n_estimators"] = int(n_estimators)
-            ensemble_params["sampling_ratio"] = float(sampling_ratio)
-            ensemble_params["n_jobs"] = cpu_count()
-            result = evaluate_ensemble(train_set, test_set,
-                                       ensemble_params, transformer_params)
-            result = concatenate_dicts(hyperparameters, result)
-            result["type"] = "ensemble"
-            export_json(result, filename)
-            print(result)
+
+def reshape_dataset(train, test):
+    def channels_last(X):
+        X = np.swapaxes(X, 1, 2)
+        X = np.swapaxes(X, 2, 3)
+        return X
+
+    X_train, y_train = train._datasets[0], train._datasets[1]
+    X_test, y_test = test._datasets[0], test._datasets[1]
+    X_train, X_test = channels_last(X_train), channels_last(X_test)
+    return ((X_train, y_train), (X_test, y_test))
+
+
+def load_cifar():
+    train, test = get_cifar10(ndim=3)
+    return reshape_dataset(train, test)
+
+
+def load_mnist():
+    train, test = get_mnist(ndim=3)
+    return reshape_dataset(train, test)
+
+
+def run_cifar(n_train=None, n_test=None, model_type="normal"):
+    datasize = {"n_train": n_train, "n_test": n_test}
+    transformer_params = {
+        "image_shape": 32,
+        "filter_shape_l1": 5, "step_shape_l1": 1, "n_l1_output": 16,
+        "filter_shape_l2": 5, "step_shape_l2": 1, "n_l2_output": 8,
+        "filter_shape_pooling": 8, "step_shape_pooling": 4
+    }
+    ensemble_params = {
+        "n_estimators" : 200,
+        "sampling_ratio" : 0.01,
+        "n_jobs" : -1
+    }
+    dataset = load_cifar()
+    run(dataset, datasize, transformer_params, ensemble_params, model_type)
+
+
+def run_mnist(n_train=None, n_test=None, model_type="normal"):
+    datasize = {"n_train": n_train, "n_test": n_test}
+    transformer_params = {
+        "image_shape": 28,
+        "filter_shape_l1": 5, "step_shape_l1": 1, "n_l1_output": 16,
+        "filter_shape_l2": 5, "step_shape_l2": 1, "n_l2_output": 8,
+        "filter_shape_pooling": 5, "step_shape_pooling": 5
+    }
+    ensemble_params = {
+        "n_estimators" : 100,
+        "sampling_ratio" : 0.07,
+        "n_jobs" : -1
+    }
+    dataset = load_mnist()
+    run(dataset, datasize, transformer_params, ensemble_params, model_type)
+
+
+if __name__ == "__main__":
+    print("MNIST")
+    run_mnist(n_train=None, n_test=None, model_type="ensemble")
+    # print("CIFAR")
+    # run_cifar(n_train=None, n_test=None, model_type="ensemble")
