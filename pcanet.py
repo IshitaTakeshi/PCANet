@@ -260,11 +260,19 @@ class PCANet(object):
             filter_shape=self.filter_shape_l1,
         )
 
+        if GPU_ENABLED:
+            images = to_gpu(images)
+            filters_l1 = to_gpu(filters_l1)
+
         images = convolution_2d(
             images,
             filters_l1,
             stride=self.step_shape_l1
         ).data
+
+        if GPU_ENABLED:
+            images = to_cpu(images)
+            filters_l1 = to_cpu(filters_l1)
 
         # images.shape == (n_images, L1, y, x)
         images = images.reshape(-1, *images.shape[2:4])
