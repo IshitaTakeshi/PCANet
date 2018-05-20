@@ -286,7 +286,7 @@ class PCANet(object):
             self.pca_l2.partial_fit(patches)
         return self
 
-    def transform_batch(self, images):
+    def transform(self, images):
         images = self.process_input(images)
         # images.shape == (n_images, n_channels, y, x)
 
@@ -346,14 +346,6 @@ class PCANet(object):
 
         # The shape of X is (n_images, L1 * vector length)
         return X
-
-    def transform(self, images, batch_size=1024):
-        X = []
-        for i in range(0, len(images), batch_size):
-            # separate into batches and transform each for memory efficiency
-            W = self.transform_batch(images[i:i+batch_size])
-            X.append(W)
-        return np.vstack(X)
 
     def validate_structure(self):
         """
