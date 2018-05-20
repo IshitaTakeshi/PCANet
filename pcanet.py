@@ -10,8 +10,6 @@ import cupy
 import numpy as np
 from sklearn.decomposition import PCA, IncrementalPCA
 
-from histogram import histogram
-
 
 def steps(image_shape, filter_shape, step_shape):
     h, w = image_shape
