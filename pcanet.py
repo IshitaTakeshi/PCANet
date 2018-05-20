@@ -2,14 +2,16 @@
 
 import itertools
 
-from chainer.cuda import to_gpu, to_cpu, get_device
+from chainer.cuda import to_gpu, to_cpu
 from chainer.functions import convolution_2d
 
 import numpy as np
 from sklearn.decomposition import IncrementalPCA
 
+from utils import check_gpu_enabled
 
-GPU_ENABLED = (get_device().id >= 0)
+
+GPU_ENABLED = check_gpu_enabled()
 
 if GPU_ENABLED:
     import cupy as xp

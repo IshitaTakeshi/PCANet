@@ -1,12 +1,21 @@
 import unittest
 import numpy as np
-# from numpy.testing import assert_array_equal
-import cupy
-from cupy.testing import assert_array_equal
+
+from chainer.cuda import to_gpu, to_cpu, get_device
 
 from pcanet import Patches, PCANet, image_to_patch_vectors
 from pcanet import binarize, binary_to_decimal, to_tuple_if_int
 from ensemble import most_frequent_label
+
+from utils import check_gpu_enabled
+
+
+if check_gpu_enabled():
+    import cupy as xp
+    from cupy.testing import assert_array_equal
+else:
+    import numpy as xp
+    from numpy.testing import assert_array_equal
 
 
 class TestPatches(unittest.TestCase):
@@ -68,7 +77,7 @@ class TestPCANet(unittest.TestCase):
         assert_array_equal(binarize(image), expected)
 
     def test_binary_to_decimal(self):
-        image = cupy.array([
+        image = xp.array([
             [[[1, 0],
               [1, 0]],
              [[1, 1],
@@ -78,7 +87,7 @@ class TestPCANet(unittest.TestCase):
              [[1, 0],
               [1, 0]]]
         ])
-        expected = cupy.array([
+        expected = xp.array([
             [[3, 1],
              [2, 1]],
             [[3, 2],
@@ -87,7 +96,7 @@ class TestPCANet(unittest.TestCase):
         assert_array_equal(binary_to_decimal(image), expected)
 
     def test_histogram(self):
-        images = cupy.array([
+        images = xp.array([
             [[0, 1, 1, 3],
              [3, 1, 2, 2],
              [2, 0, 1, 2],
@@ -97,7 +106,7 @@ class TestPCANet(unittest.TestCase):
              [2, 2, 2, 3],
              [1, 3, 3, 1]]
         ])
-        expected = cupy.array([
+        expected = xp.array([
             [1, 2, 0, 1, 0, 1, 2, 1, 2, 1, 1, 0, 0, 3, 1, 0],
             [1, 1, 1, 1, 1, 2, 1, 0, 0, 1, 2, 1, 0, 1, 1, 2]
         ])
@@ -107,7 +116,7 @@ class TestPCANet(unittest.TestCase):
                         step_shape_pooling=2)
         assert_array_equal(pcanet.histogram(images), expected)
 
-        images = cupy.array([
+        images = xp.array([
             [[1, 0, 1],
              [2, 0, 0],
              [1, 3, 3]],
@@ -115,7 +124,7 @@ class TestPCANet(unittest.TestCase):
              [1, 1, 1],
              [3, 0, 1]]
         ])
-        expected = cupy.array([
+        expected = xp.array([
             [2, 1, 1, 0, 3, 1, 0, 0, 1, 1, 1, 1, 2, 0, 0, 2],
             [1, 2, 1, 0, 2, 2, 0, 0, 1, 2, 0, 1, 1, 3, 0, 0]
         ])
