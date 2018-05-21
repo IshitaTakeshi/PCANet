@@ -7,7 +7,7 @@ from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
 
 from pcanet import PCANet
-from utils import load_model, save_model, load_mnist
+from utils import load_model, save_model, load_mnist, set_device
 
 
 parser = argparse.ArgumentParser(description="PCANet example")
@@ -70,9 +70,7 @@ train_set, test_set = load_mnist()
 
 
 if args.gpu >= 0:
-    from cupy.cuda import Device
-    Device(args.gpu).use()
-    print("GPU {} is in use".format(args.gpu))
+    set_device(args.gpu)
 
 
 if args.mode == "train":
