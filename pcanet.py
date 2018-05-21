@@ -8,13 +8,14 @@ from chainer.functions import convolution_2d
 import numpy as np
 from sklearn.decomposition import IncrementalPCA
 
-from utils import check_gpu_enabled
+from utils import gpu_enabled
 
 
-GPU_ENABLED = check_gpu_enabled()
-
-if GPU_ENABLED:
-    import cupy as xp
+if gpu_enabled():
+    try:
+        import cupy as xp
+    except ImportError:
+        import numpy as xp
 else:
     import numpy as xp
 
@@ -260,7 +261,7 @@ class PCANet(object):
             filter_shape=self.filter_shape_l1,
         )
 
-        if GPU_ENABLED:
+        if gpu_enabled():
             images = to_gpu(images)
             filters_l1 = to_gpu(filters_l1)
 
@@ -270,7 +271,7 @@ class PCANet(object):
             stride=self.step_shape_l1
         ).data
 
-        if GPU_ENABLED:
+        if gpu_enabled():
             images = to_cpu(images)
             filters_l1 = to_cpu(filters_l1)
 
@@ -302,7 +303,7 @@ class PCANet(object):
             filter_shape=self.filter_shape_l2
         )
 
-        if GPU_ENABLED:
+        if gpu_enabled():
             images = to_gpu(images)
             filters_l1 = to_gpu(filters_l1)
             filters_l2 = to_gpu(filters_l2)
@@ -332,6 +333,7 @@ class PCANet(object):
             maps = binary_to_decimal(maps)
             # maps.shape == (n_images, y, x)
             x = self.histogram(maps)
+
             # x is a set of feature vectors.
             # The shape of x is (n_images, vector length)
             X.append(x)
@@ -339,7 +341,7 @@ class PCANet(object):
         # concatenate over L1
         X = xp.hstack(X)
 
-        if GPU_ENABLED:
+        if gpu_enabled():
             X = to_cpu(X)
 
         X = X.astype(np.float64)
