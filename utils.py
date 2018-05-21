@@ -1,13 +1,52 @@
 import numpy as np
 import pickle
 
+try:
+    import importlib
+except ImportError:
+    import imp as importlib
+
 from chainer.datasets import get_mnist, get_cifar10
 from chainer.cuda import get_device
 
 
-def check_gpu_enabled():
-    """Return true if GPU is available"""
-    return get_device().id >= 0
+GPU_ENABLED = False
+
+
+def set_device(device_id):
+    """
+    Set the device (CPU or GPU) to be used.
+    if device_id >= 0 the corresponding GPU is used, otherwise CPU is used.
+    """
+    if device_id < 0:
+        # Use CPU
+        return
+
+    try:
+        from cupy.cuda import Device
+        from cupy.cuda.runtime import CUDARuntimeError
+    except ImportError:
+        print("Failed to import CuPy. Use CPU instead.")
+        return
+
+    try:
+        Device(device_id).use()
+    except CUDARuntimeError as e:
+        print(e)
+        return
+
+    print("Device {} is in use".format(device_id))
+
+    global GPU_ENABLED
+    GPU_ENABLED = True
+
+    # Reload the module to reflect the GPU status
+    import pcanet
+    importlib.reload(pcanet)
+
+
+def gpu_enabled():
+    return GPU_ENABLED
 
 
 def reshape_dataset(train, test):
