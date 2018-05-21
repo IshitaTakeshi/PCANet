@@ -1,19 +1,15 @@
 import unittest
 import numpy as np
 
-from chainer.cuda import to_gpu, to_cpu, get_device
-
 from pcanet import Patches, PCANet, image_to_patch_vectors
 from pcanet import binarize, binary_to_decimal, to_tuple_if_int
 from ensemble import most_frequent_label
 
-from utils import check_gpu_enabled
 
-
-if check_gpu_enabled():
+try:
     import cupy as xp
     from cupy.testing import assert_array_equal
-else:
+except ImportError:
     import numpy as xp
     from numpy.testing import assert_array_equal
 
