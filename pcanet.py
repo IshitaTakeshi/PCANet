@@ -156,15 +156,27 @@ class PCANet(object):
             Input image shape.
         filter_shape_l1: int or sequence of ints
             The shape of the kernel in the first convolution layer.
+            If the value is int, a filter of the square shape is applied.
+            If you want to apply a filter of a different aspect ratio, just
+            pass a tuple of shape (height, width).
         step_shape_l1: int or sequence of ints
             The shape of kernel step in the first convolution layer.
+            If the value is int, a step of the square shape is applied.
+            If you want to apply a step of a different aspect ratio, just
+            pass a tuple of shape (height, width).
         n_l1_output:
             L1 in the original paper. The number of outputs obtained
             from a set of input images.
         filter_shape_l2: int or sequence of ints
             The shape of the kernel in the second convolution layer.
+            If the value is int, a filter of the square shape is applied.
+            If you want to apply a filter of a different aspect ratio, just
+            pass a tuple of shape (height, width).
         step_shape_l2: int or sequence of ints
             The shape of kernel step in the second convolution layer.
+            If the value is int, a step of the square shape is applied.
+            If you want to apply a step of a different aspect ratio, just
+            pass a tuple of shape (height, width).
         n_l2_output:
             L2 in the original paper. The number of outputs obtained
             from each L1 output.
