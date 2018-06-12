@@ -227,12 +227,12 @@ class PCANet(object):
             [2 2 2]
             [2 3 3]
 
-        If default bins ``[-0.5 0.5 1.5 2.5 3.5]`` applied,
-        then the histogram will be ``[2 1 4 2]``.
-        If ``n_bins`` is specified, the range of data divided equally.
-        For example, if the data is in range ``[0, 3]`` and
-        ``n_bins = 2``, bins will be ``[-0.5 1.5 3.5]`` and
-        the histogram will be ``[3 6]``.
+        | If default bins ``[-0.5 0.5 1.5 2.5 3.5]`` applied,
+          the histogram will be ``[2 1 4 2]``.
+        | If ``n_bins`` is specified, the range of data divided equally.
+
+        | For example, if the data is in range ``[0, 3]`` and ``n_bins = 2``,
+        | bins will be ``[-0.5 1.5 3.5]`` and the histogram will be ``[3 6]``.
         """
 
         k = pow(2, self.n_l2_output)
@@ -375,8 +375,11 @@ class PCANet(object):
         """
         Check that the filter visits all pixels of input images without
         dropping any information.
-        Raise ValueError if the network structure does not satisfy the
-        above constraint.
+
+        Raises
+        ------
+        ValueError:
+            if the network structure does not satisfy the above constraint.
         """
         def is_valid_(input_shape, filter_shape, step_shape):
             ys, xs = steps(input_shape, filter_shape, step_shape)
