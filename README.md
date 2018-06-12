@@ -50,13 +50,13 @@ See [run_mnist.py](./run_mnist.py) for more details.
 
 CPU is used if you specify a negative value for the GPU ID
 
-## Train
+__Train__
 
 ```
 python3 run_mnist.py --gpu <GPU ID> train --out <output directory (default='result')>
 ```
 
-## Test
+__Test__
 
 ```
 python3 run_mnist.py --gpu <GPU ID> test --pretrained-model <path to dir (default='result')>
