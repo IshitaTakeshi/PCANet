@@ -24,7 +24,7 @@ train_parser.add_argument("--out", "-o", default="result",
 test_parser = subparsers.add_parser("test")
 test_parser.add_argument("--pretrained-model", default="result",
                          dest="pretrained_model",
-                         help="Directory to the trained model")
+                         help="Directory containing the trained model")
 
 args = parser.parse_args()
 
