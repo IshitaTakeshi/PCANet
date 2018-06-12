@@ -12,7 +12,7 @@ Welcome to PCANet's documentation!
 
 .. automodule:: pcanet
     :members:
-
+    :undoc-members:
 
 Indices and tables
 ==================

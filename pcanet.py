@@ -21,6 +21,23 @@ else:
 
 
 def steps(image_shape, filter_shape, step_shape):
+    """
+    Generates feature map coordinates that filters visit
+
+    Parameters
+    ----------
+    image_shape: tuple of ints
+        Image height / width
+    filter_shape: tuple of ints
+        Filter height / width
+    step_shape: tuple of ints
+        Step height / width
+
+    Returns
+    -------
+    ys: Map coordinates along y axis
+    xs: Map coordinates along x axis
+    """
     h, w = image_shape
     fh, fw = filter_shape
     sh, sw = step_shape
@@ -31,6 +48,11 @@ def steps(image_shape, filter_shape, step_shape):
 
 
 def components_to_filters(components, n_channels, filter_shape):
+    """
+    | In PCANet, components of PCA are used as filter weights.
+    | This function reshapes PCA components so that
+      it can be used as networks filters
+    """
     n_filters = components.shape[0]
     return components.reshape(n_filters, n_channels, *filter_shape)
 
@@ -76,6 +98,11 @@ def atleast_4d(images):
 
 
 def to_channels_first(images):
+    """
+    Change image channel order from
+    :code:`(n_images, y, x, n_channels)` to
+    :code:`(n_images, n_channels, y, x)`
+    """
     # images.shape == (n_images, y, x, n_channels)
     images = np.swapaxes(images, 1, 3)
     images = np.swapaxes(images, 2, 3)
@@ -87,7 +114,7 @@ def image_to_patch_vectors(image, filter_shape, step_shape):
     """
     Parameters
     ----------
-    image: np.array
+    image: np.ndarray
         Image to extract patch vectors
     filter_shape: tuple of ints
         The shape of a filter
@@ -96,7 +123,7 @@ def image_to_patch_vectors(image, filter_shape, step_shape):
 
     Returns
     -------
-    X: np.array
+    X: np.ndarray
         A set of normalized and flattened patches
     """
 
@@ -109,6 +136,13 @@ def image_to_patch_vectors(image, filter_shape, step_shape):
 
 
 def binarize(X):
+    """
+    Binarize each element of :code:`X`
+
+    .. code::
+
+        X = [1 if X[i] > 0 else 0 for i in range(len(X))]
+    """
     X[X > 0] = 1
     X[X <= 0] = 0
     return X
@@ -227,12 +261,12 @@ class PCANet(object):
             [2 2 2]
             [2 3 3]
 
-        If default bins ``[-0.5 0.5 1.5 2.5 3.5]`` applied,
-        then the histogram will be ``[2 1 4 2]``.
-        If ``n_bins`` is specified, the range of data divided equally.
-        For example, if the data is in range ``[0, 3]`` and
-        ``n_bins = 2``, bins will be ``[-0.5 1.5 3.5]`` and
-        the histogram will be ``[3 6]``.
+        | If default bins ``[-0.5 0.5 1.5 2.5 3.5]`` applied,
+          the histogram will be ``[2 1 4 2]``.
+        | If ``n_bins`` is specified, the range of data divided equally.
+
+        | For example, if the data is in range ``[0, 3]`` and ``n_bins = 2``,
+        | bins will be ``[-0.5 1.5 3.5]`` and the histogram will be ``[3 6]``.
         """
 
         k = pow(2, self.n_l2_output)
@@ -261,6 +295,16 @@ class PCANet(object):
         return images
 
     def fit(self, images):
+        """
+        Train PCANet
+
+        Parameters
+        ----------
+        images: np.ndarray
+            | Color / grayscale images of shape
+            | (n_images, height, width, n_channels) or
+            | (n_images, height, width)
+        """
         images = self.process_input(images)
         # images.shape == (n_images, n_channels, y, x)
 
@@ -310,6 +354,20 @@ class PCANet(object):
         return self
 
     def transform(self, images):
+        """
+        Parameters
+        ----------
+        images: np.ndarray
+            | Color / grayscale images of shape
+            | (n_images, height, width, n_channels) or
+            | (n_images, height, width)
+
+        Returns
+        -------
+        X: np.ndarray
+            A set of feature vectors of shape (n_images, n_features)
+            where :code:`n_features` is determined by the hyperparameters
+        """
         images = self.process_input(images)
         # images.shape == (n_images, n_channels, y, x)
 
@@ -375,8 +433,11 @@ class PCANet(object):
         """
         Check that the filter visits all pixels of input images without
         dropping any information.
-        Raise ValueError if the network structure does not satisfy the
-        above constraint.
+
+        Raises
+        ------
+        ValueError:
+            if the network structure does not satisfy the above constraint.
         """
         def is_valid_(input_shape, filter_shape, step_shape):
             ys, xs = steps(input_shape, filter_shape, step_shape)
