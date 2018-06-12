@@ -116,20 +116,30 @@ def binarize(X):
 
 def binary_to_decimal(X):
     """
+    | This function takes :code:`X` of shape (n_images, L2, y, x) as an argument.
+    | Supporse that :code:`X[k]` (0 <= k < n_images) can be represented as
+
+    .. code-block:: none
+
+        X[k] = [map_k[0], map_k[1], ..., map_k[L2-1]]
+
+    where the shape of each map_k is (y, x).
+
+    Then we calculate
+
+    .. code-block:: none
+
+        a[0] * map_k[0] + a[1] * map_k[1] + ... + a[L2-1] * map_k[L2-1]
+
+    for each :code:`X[k]`, where :math:`a = [2^{L2-1}, 2^{L2-2}, ..., 2^{0}]`
+
+    Therefore, the output shape must be (n_images, y, x)
+
     Parameters
     ----------
     X: xp.ndarray
         Feature maps
     """
-    # This function expects X of shape (n_images, L2, y, x)
-    # as an argument.
-    # Let's say that X[k] (0 <= k < n_images) can be represented like
-    # X[k] = [map_k[0], map_k[1], ..., map_k[L2-1]]
-    # where the shape of each map_k is (y, x).
-    # Then we calculate
-    # a[0] * map_k[0] + a[1] * map_k[1] + ... + a[L2-1] * map_k[L2-1]
-    # for each X[k], where a = [2^(L2-1), 2^(L2-2), ..., 2^0]
-    # Therefore, the output shape must be (n_images, y, x)
     a = xp.arange(X.shape[1])[::-1]
     a = xp.power(2, a)
     return xp.tensordot(X, a, axes=([1], [0]))
