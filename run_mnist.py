@@ -6,7 +6,8 @@ import argparse
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
 
-from pcanet import PCANet
+# avoid the odd behavior of pickle by importing under a different name
+import pcanet as net
 from utils import load_model, save_model, load_mnist, set_device
 
 
@@ -32,7 +33,7 @@ args = parser.parse_args()
 def train(train_set):
     images_train, y_train = train_set
 
-    pcanet = PCANet(
+    pcanet = net.PCANet(
         image_shape=28,
         filter_shape_l1=5, step_shape_l1=1, n_l1_output=8,
         filter_shape_l2=5, step_shape_l2=1, n_l2_output=4,
