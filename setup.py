@@ -7,7 +7,6 @@ setup(
     author="Takeshi Ishita",
     py_modules=["pcanet"],
     install_requires=[
-        'cupy==5.0.0a1',
         'chainer',
         'numpy',
         'psutil',
