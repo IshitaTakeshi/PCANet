@@ -33,11 +33,13 @@ args = parser.parse_args()
 def train(train_set):
     images_train, y_train = train_set
 
+    print("Training PCANet")
+
     pcanet = net.PCANet(
         image_shape=28,
-        filter_shape_l1=5, step_shape_l1=1, n_l1_output=8,
-        filter_shape_l2=5, step_shape_l2=1, n_l2_output=4,
-        filter_shape_pooling=5, step_shape_pooling=5
+        filter_shape_l1=2, step_shape_l1=1, n_l1_output=3,
+        filter_shape_l2=2, step_shape_l2=1, n_l2_output=3,
+        filter_shape_pooling=2, step_shape_pooling=2
     )
 
     pcanet.validate_structure()
@@ -53,6 +55,8 @@ def train(train_set):
     t2 = timeit.default_timer()
 
     transform_time = t2 - t1
+
+    print("Training the classifier")
 
     classifier = SVC(C=10)
     classifier.fit(X_train, y_train)
@@ -83,6 +87,7 @@ if args.mode == "train":
 
     save_model(pcanet, join(args.out, "pcanet.pkl"))
     save_model(classifier, join(args.out, "classifier.pkl"))
+    print("Model saved")
 
 elif args.mode == "test":
     pcanet = load_model(join(args.pretrained_model, "pcanet.pkl"))
