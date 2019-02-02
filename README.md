@@ -10,6 +10,8 @@ Details are described in [the original paper](https://arxiv.org/abs/1404.3606).
 Just running `python3 setup.py install`.  
 If you prefer pip, `pip3 install .` in the PCANet root directory.
 
+If you want to run on GPU, see [the installation guide of Chainer](https://docs.chainer.org/en/stable/install.html).
+
 ## Usage
 
 ```python
