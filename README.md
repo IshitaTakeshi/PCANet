@@ -19,13 +19,11 @@ from pcanet import PCANet
 
 # Arguments are basically passed as tuple in the form (height, width) but int is also allowed. 
 # If int is given, the parameter will be converted into (size, size) implicitly.
-pcanet = PCANet(
-    image_shape=28,  # the size of an input image
-    # kernel size, kernel step size, and the number of filters in the first layer, respectively
-    filter_shape_l1=2, step_shape_l1=1, n_l1_output=4,
-    # kernel size, kernel step size, and the number of filters in the second layer, respectively
-    filter_shape_l2=2, step_shape_l2=1, n_l2_output=4,
-    block_shape=2  # the size of area to calculate histogram
+pcanet = net.PCANet(
+    image_shape=28,
+    filter_shape_l1=2, step_shape_l1=1, n_l1_output=3,  # parameters for the 1st layer
+    filter_shape_l2=2, step_shape_l2=1, n_l2_output=3,  # parameters for the 2nd layer
+    filter_shape_pooling=2, step_shape_pooling=2        # parameters for the pooling layer
 )
 
 # Check whether all pixels can be considered. Raise ValueError if the structure is not valid.
