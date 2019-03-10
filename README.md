@@ -15,7 +15,7 @@ If you want to run on GPU, see [the installation guide of Chainer](https://docs.
 ## Usage
 
 ```python
-from pcanet import PCANet
+import pcanet as net
 
 # Arguments are basically passed as tuple in the form (height, width) but int is also allowed. 
 # If int is given, the parameter will be converted into (size, size) implicitly.
